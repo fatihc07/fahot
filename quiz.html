@@ -92,9 +92,13 @@
         top: 1.5rem;
         left: 1rem;
         z-index: 200;
+        flex-direction: column;
+        align-items: flex-start;
+        gap: 0.1rem;
       "
     >
-      <img src="logo.png" alt="FAHOT" style="height: 40px; filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.4));">
+      <img src="logo.png" alt="FAHOT" style="height: 50px; filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.4));">
+      <span style="font-size: 0.4rem; font-weight: 900; color: var(--primary); letter-spacing: 0.15em; opacity: 0.7;">BY FATİH</span>
     </div>
     <div class="timer-header">
       <div class="timer-fill" id="timer-bar"></div>
@@ -421,7 +425,20 @@
           }
 
           if (game && game.status === "leaderboard") {
-            window.location.href = `results.html?gameId=${gameId}&playerId=${playerId}`;
+            document.body.innerHTML = `
+                <div class="container fade-in">
+                    <div class="glass-card" style="border-top: 8px solid var(--primary)">
+                        <div style="font-size: 5rem; margin-bottom: 1rem;">🏆</div>
+                        <h1 style="font-size: 2.5rem;">Sıralama Ekranda!</h1>
+                        <p class="subtitle" style="font-size: 1.2rem; margin-top: 1rem;">Liderlik tablosu şu an sunucu ekranında.<br>Kendi başarını takip et ve yeni soruya hazırlan!</p>
+                        <div style="margin-top: 2rem; font-size: 0.8rem; color: var(--text-muted);">Sıradaki soru birazdan gelecek... 🚀</div>
+                    </div>
+                </div>
+            `;
+            // Still listen for the next question
+            client.channel('next-q').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, (p) => {
+                if (p.new.status === 'in_progress') window.location.reload();
+            }).subscribe();
             return;
           }
 
