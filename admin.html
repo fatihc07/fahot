@@ -1,0 +1,904 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuizPulse - Yönetici Paneli</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="questions-bank.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+  </head>
+  <body>
+    <div class="bg-blobs">
+      <div class="blob"></div>
+      <div class="blob blob-2"></div>
+    </div>
+
+    <div class="container admin-container fade-in" style="max-width: 800px">
+      <div
+        style="
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          margin-bottom: 2rem;
+        "
+      >
+        <div>
+          <h1>Yönetici</h1>
+          <p style="color: var(--text-muted); text-align: left">
+            Sistem ve Yarışma Kontrolü
+          </p>
+        </div>
+        <div
+          class="stat-card"
+          style="padding: 0.5rem 1rem; border-color: var(--accent)"
+        >
+          <span
+            style="font-size: 0.7rem; color: var(--accent); font-weight: 800"
+            >ADMİN MODU</span
+          >
+        </div>
+      </div>
+
+      <div class="stats-grid">
+        <div class="stat-card">
+          <span class="stat-value" id="stat-total-games">-</span>
+          <span class="stat-label">Toplam Oyun</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-total-players">-</span>
+          <span class="stat-label">Toplam Katılım</span>
+        </div>
+        <div class="stat-card">
+          <span class="stat-value" id="stat-unique-players">-</span>
+          <span class="stat-label">Benzersiz Oyuncu</span>
+        </div>
+      </div>
+
+      <div
+        class="glass-card"
+        style="margin-bottom: 2rem; border-color: var(--primary)"
+      >
+        <h2 style="margin-bottom: 1.5rem; font-size: 1.2rem; text-align: left">
+          <i
+            data-lucide="library"
+            style="
+              vertical-align: middle;
+              margin-right: 0.5rem;
+              color: var(--primary);
+            "
+          ></i>
+          Kayıtlı Yarışmalarım
+        </h2>
+        <div
+          id="saved-quizzes-list"
+          class="stats-grid"
+          style="
+            grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+            text-align: left;
+          "
+        >
+          <p style="color: var(--text-muted); font-size: 0.8rem">
+            Yarışmalar yükleniyor...
+          </p>
+        </div>
+      </div>
+
+      <div
+        class="glass-card"
+        style="margin-bottom: 2rem; border-color: var(--primary)"
+      >
+        <div
+          style="
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+          "
+        >
+          <div>
+            <h2
+              style="font-size: 1.2rem; margin-bottom: 0.5rem; text-align: left"
+            >
+              Markalama & Tema
+            </h2>
+            <p class="subtitle" style="font-size: 0.8rem; text-align: left">
+              Uygulama renklerini özelleştirin.
+            </p>
+          </div>
+          <div
+            style="
+              display: flex;
+              gap: 1rem;
+              align-items: center;
+              flex-wrap: wrap;
+            "
+          >
+            <button
+              onclick="
+                document.getElementById('help-modal').style.display = 'flex'
+              "
+              style="
+                background: rgba(255, 255, 255, 0.1);
+                border: 1px solid var(--glass-border);
+                color: white;
+                border-radius: 50%;
+                width: 40px;
+                height: 40px;
+                cursor: pointer;
+                font-weight: 900;
+                font-size: 1.2rem;
+                flex-shrink: 0;
+              "
+            >
+              ?
+            </button>
+            <div style="text-align: right; min-width: 80px">
+              <label
+                style="
+                  font-size: 0.6rem;
+                  font-weight: 800;
+                  color: var(--text-muted);
+                  display: block;
+                  white-space: nowrap;
+                "
+                >BAHİS MODU</label
+              >
+              <input
+                type="checkbox"
+                id="is-bet-enabled"
+                style="width: 25px; height: 25px; cursor: pointer"
+              />
+            </div>
+            <div style="text-align: right">
+              <label
+                style="
+                  font-size: 0.6rem;
+                  font-weight: 800;
+                  color: var(--text-muted);
+                "
+                >MARKA RENGİ</label
+              >
+              <input
+                type="color"
+                id="theme-color"
+                value="#7c3aed"
+                style="
+                  width: 50px;
+                  height: 50px;
+                  border: none;
+                  border-radius: 10px;
+                  cursor: pointer;
+                  background: transparent;
+                  display: block;
+                "
+              />
+            </div>
+            <div style="text-align: left">
+              <label
+                style="
+                  font-size: 0.6rem;
+                  font-weight: 800;
+                  color: var(--text-muted);
+                  display: block;
+                  margin-bottom: 0.2rem;
+                "
+                >TEMA STİLİ</label
+              >
+              <select
+                id="theme-style"
+                style="font-size: 0.8rem; padding: 0.5rem; width: 150px"
+              >
+                <option value="default">✨ Modern (Varsayılan)</option>
+                <option value="oled">🌑 OLED (Saf Siyah)</option>
+                <option value="cyberpunk">⚡ Cyberpunk (Neon)</option>
+                <option value="retro">👾 Retro (8-bit)</option>
+              </select>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- YARDIM MODALI -->
+      <div
+        id="help-modal"
+        style="
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.85);
+          z-index: 1000;
+          align-items: center;
+          justify-content: center;
+          backdrop-filter: blur(10px);
+        "
+      >
+        <div
+          class="glass-card"
+          style="
+            max-width: 600px;
+            padding: 2.5rem;
+            text-align: left;
+            max-height: 80vh;
+            overflow-y: auto;
+          "
+        >
+          <h2 style="color: var(--primary); margin-bottom: 1.5rem">
+            🚀 QuizPulse Özellikleri
+          </h2>
+          <div
+            style="
+              display: flex;
+              flex-direction: column;
+              gap: 1rem;
+              font-size: 0.9rem;
+            "
+          >
+            <div>
+              <strong>🔥 Bahis Modu:</strong> Aktif edilirse oyuncular her
+              sorudan önce puanlarına iddiaya girebilir. Doğru bilirlerse ek
+              puan kazanır, yanılırlarsa bahisleri düşer.
+            </div>
+            <div>
+              <strong>📊 Anket Sorusu:</strong> Soru bazında seçilebilir.
+              Anketlerde doğru cevap yoktur, sadece oylama yapılır ve puan
+              verilmez.
+            </div>
+            <div>
+              <strong>🔴🔵 Takım Modu:</strong> Oyuncular lobi girişinde
+              kendilerine takım seçebilir.
+            </div>
+            <div>
+              <strong>🖼️ Görsel/Ses:</strong> Sorulara resim veya ses URL'si
+              ekleyerek çoklu ortam yarışmaları düzenleyebilirsiniz.
+            </div>
+            <div>
+              <strong>🌑 Temalar:</strong> OLED (Saf Siyah), Cyberpunk (Neon)
+              veya Retro temalarla atmosferi değiştirin.
+            </div>
+            <div>
+              <strong>📈 Analiz:</strong> En zor soruyu (Beyin Yakan) otomatik
+              belirler ve Excel raporu sunar.
+            </div>
+          </div>
+          <button
+            class="btn"
+            style="margin-top: 2rem"
+            onclick="
+              document.getElementById('help-modal').style.display = 'none'
+            "
+          >
+            Anladım!
+          </button>
+        </div>
+      </div>
+
+      <!-- JSON YAPIŞTIR MODALI -->
+      <div
+        id="json-paste-modal"
+        style="
+          display: none;
+          position: fixed;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          background: rgba(0, 0, 0, 0.85);
+          z-index: 1000;
+          align-items: center;
+          justify-content: center;
+          backdrop-filter: blur(10px);
+        "
+      >
+        <div
+          class="glass-card"
+          style="max-width: 700px; width: 90%; padding: 2rem; text-align: left"
+        >
+          <h2 style="color: #a855f7; margin-bottom: 1rem">📋 JSON Yapıştır</h2>
+          <p class="subtitle" style="font-size: 0.8rem; margin-bottom: 1.5rem">
+            AI veya başka bir yerden aldığın soru listesini buraya yapıştır.
+          </p>
+          <textarea
+            id="json-paste-area"
+            placeholder='{ "quiz_title": "...", "questions": [...] }'
+            style="
+              width: 100%;
+              height: 300px;
+              background: rgba(0, 0, 0, 0.3);
+              border: 1px solid var(--glass-border);
+              border-radius: 12px;
+              color: #00ff41;
+              font-family: monospace;
+              padding: 1rem;
+              font-size: 0.8rem;
+              resize: none;
+            "
+          ></textarea>
+          <div style="display: flex; gap: 1rem; margin-top: 1.5rem">
+            <button
+              class="btn"
+              style="background: #a855f7"
+              onclick="importFromJsonText()"
+            >
+              Sihirbazı Başlat ⚡
+            </button>
+            <button
+              class="btn btn-secondary"
+              onclick="
+                document.getElementById('json-paste-modal').style.display =
+                  'none'
+              "
+            >
+              Vazgeç
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div class="glass-card">
+        <h2 style="margin-bottom: 1.5rem; font-size: 1.2rem; text-align: left">
+          <i
+            data-lucide="plus-circle"
+            style="
+              vertical-align: middle;
+              margin-right: 0.5rem;
+              color: var(--success);
+            "
+          ></i>
+          Yeni Yarışma Hazırla
+        </h2>
+
+        <div class="input-group">
+          <label>YARIŞMA BAŞLIĞI</label>
+          <input
+            type="text"
+            id="quiz-title"
+            placeholder="Örn: Hafta Sonu Eğlencesi"
+            style="text-align: left"
+          />
+        </div>
+
+        <div
+          style="
+            display: flex;
+            gap: 0.5rem;
+            flex-wrap: wrap;
+            margin-bottom: 2rem;
+            background: rgba(0, 0, 0, 0.2);
+            padding: 1.25rem;
+            border-radius: 16px;
+            align-items: center;
+          "
+        >
+          <p
+            style="
+              width: 100%;
+              font-size: 0.75rem;
+              color: var(--text-muted);
+              margin-bottom: 0.75rem;
+              font-weight: 700;
+            "
+          >
+            HAZIR SORU PAKETLERİ VE İÇE AKTARMA:
+          </p>
+          <button
+            class="btn btn-secondary"
+            onclick="importFromBank('Tarih_P1')"
+            style="font-size: 0.75rem; padding: 0.6rem"
+          >
+            📜 Tarih
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="importFromBank('Coğrafya_P1')"
+            style="font-size: 0.75rem; padding: 0.6rem"
+          >
+            🌍 Coğrafya
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="importFromBank('Bilim_P1')"
+            style="font-size: 0.75rem; padding: 0.6rem"
+          >
+            🧪 Bilim
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="importFromBank('Kültür_P1')"
+            style="font-size: 0.75rem; padding: 0.6rem"
+          >
+            🎨 Kültür
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="importFromBank('Spor_P1')"
+            style="font-size: 0.75rem; padding: 0.6rem"
+          >
+            ⚽ Spor
+          </button>
+          <button
+            class="btn btn-secondary"
+            onclick="importFromBank('Sanat_P1')"
+            style="font-size: 0.75rem; padding: 0.6rem"
+          >
+            🖼️ Sanat
+          </button>
+          <button
+            class="btn btn-secondary"
+            id="btn-report"
+            onclick="downloadReport()"
+            style="
+              font-size: 0.75rem;
+              padding: 0.6rem;
+              border-color: var(--accent);
+              color: var(--accent);
+            "
+          >
+            📊 Rapor İndir
+          </button>
+          <div
+            style="
+              height: 20px;
+              width: 1px;
+              background: var(--glass-border);
+              margin: 0 0.5rem;
+            "
+          ></div>
+          <label
+            class="btn btn-secondary"
+            style="
+              font-size: 0.75rem;
+              padding: 0.6rem;
+              margin: 0;
+              cursor: pointer;
+              border-color: #3b82f6;
+              color: #3b82f6;
+            "
+          >
+            <i data-lucide="upload" style="width: 14px"></i> JSON Yükle
+            <input
+              type="file"
+              id="json-file-input"
+              accept=".json"
+              style="display: none"
+              onchange="importFromJsonFile(event)"
+            />
+          </label>
+          <button
+            class="btn btn-secondary"
+            onclick="
+              document.getElementById('json-paste-modal').style.display = 'flex'
+            "
+            style="
+              font-size: 0.75rem;
+              padding: 0.6rem;
+              border-color: #a855f7;
+              color: #a855f7;
+            "
+          >
+            <i data-lucide="clipboard-paste" style="width: 14px"></i> JSON
+            Yapıştır
+          </button>
+        </div>
+
+        <div
+          style="
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 1rem;
+            margin: 2rem 0;
+            padding: 1rem;
+            background: rgba(255, 255, 255, 0.05);
+            border-radius: 16px;
+            position: sticky;
+            top: 20px;
+            z-index: 100;
+            backdrop-filter: blur(10px);
+            border: 1px solid var(--glass-border);
+          "
+        >
+          <button class="btn btn-secondary" id="btn-add-question">
+            <i data-lucide="plus"></i> Soru Ekle
+          </button>
+          <button class="btn" id="btn-save-quiz">
+            <i data-lucide="save"></i> Kaydet
+          </button>
+        </div>
+
+        <div id="questions-list">
+          <!-- Soru formları buraya gelecek -->
+        </div>
+
+        <button
+          class="btn btn-secondary"
+          style="margin-top: 1rem; border: none; font-size: 0.9rem"
+          onclick="window.location.href = 'index.html'"
+        >
+          Ana Sayfaya Dön
+        </button>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      const client = window.supabaseClient;
+      const questionsList = document.getElementById("questions-list");
+      let questionCount = 0;
+
+      async function loadStats() {
+        const { count: gamesCount } = await client
+          .from("games")
+          .select("*", { count: "exact", head: true })
+          .neq("status", "template");
+        document.getElementById("stat-total-games").textContent =
+          gamesCount || 0;
+
+        const { count: playersCount } = await client
+          .from("players")
+          .select("*", { count: "exact", head: true });
+        document.getElementById("stat-total-players").textContent =
+          playersCount || 0;
+
+        const { data: players } = await client
+          .from("players")
+          .select("nickname");
+        if (players) {
+          const uniqueNames = new Set(
+            players.map((p) => p.nickname.trim().toLowerCase()),
+          );
+          document.getElementById("stat-unique-players").textContent =
+            uniqueNames.size;
+        }
+      }
+
+      async function loadSavedQuizzes() {
+        const listEl = document.getElementById("saved-quizzes-list");
+        const { data: templates } = await client
+          .from("games")
+          .select("id, pin")
+          .eq("status", "template")
+          .order("created_at", { ascending: false });
+
+        if (!templates || templates.length === 0) {
+          listEl.innerHTML =
+            '<p style="color:var(--text-muted); grid-column: 1/-1;">Henüz kayıtlı yarışmanız yok.</p>';
+          return;
+        }
+
+        listEl.innerHTML = templates
+          .map((t) => {
+            const title = t.pin.replace("TEMP_", "") || "İsimsiz";
+            return `
+                    <div class="stat-card" style="padding: 1.25rem; text-align: left; background: rgba(255,255,255,0.02);">
+                        <h3 style="font-size: 0.95rem; margin-bottom: 0.75rem; white-space: nowrap; overflow: hidden; text-overflow: ellipsis;">${title}</h3>
+                        <button class="btn" onclick="window.location.href='host.html?templateId=${t.id}'" style="padding: 0.5rem; font-size: 0.8rem; border-radius: 10px;">
+                            <i data-lucide="play" style="width:14px;"></i> Başlat
+                        </button>
+                    </div>
+                `;
+          })
+          .join("");
+        lucide.createIcons();
+      }
+
+      function importFromBank(category) {
+        const data = QUESTION_BANK[category];
+        if (!data) return;
+        if (
+          confirm(
+            `${category} paketindeki ${data.length} soruyu yüklemek istiyor musun?`,
+          )
+        ) {
+          document.getElementById("quiz-title").value = category;
+          questionsList.innerHTML = "";
+          questionCount = 0;
+          data.forEach((qData) => createQuestionWithData(qData));
+        }
+      }
+
+      function importFromJsonText() {
+        const text = document.getElementById("json-paste-area").value;
+        if (!text.trim()) return;
+        try {
+          const data = JSON.parse(text);
+          processImportedData(data, "Yapıştırılan Veri");
+          document.getElementById("json-paste-modal").style.display = "none";
+          document.getElementById("json-paste-area").value = "";
+        } catch (e) {
+          alert("JSON Hatası: " + e.message);
+        }
+      }
+
+      function importFromJsonFile(event) {
+        const file = event.target.files[0];
+        if (!file) return;
+
+        const reader = new FileReader();
+        reader.onload = function (e) {
+          try {
+            const parsedData = JSON.parse(e.target.result);
+            processImportedData(parsedData, file.name.replace(".json", ""));
+          } catch (error) {
+            alert("Geçersiz JSON dosyası! Hata: " + error.message);
+          }
+          event.target.value = "";
+        };
+        reader.readAsText(file);
+      }
+
+      function processImportedData(parsedData, defaultTitle) {
+        let questionsToLoad = [];
+        let quizTitle =
+          parsedData.quiz_title || parsedData.title || defaultTitle;
+
+        if (parsedData.questions && Array.isArray(parsedData.questions)) {
+          questionsToLoad = parsedData.questions.map((q) => {
+            let correctIndex = 0;
+            let options = ["", "", "", ""];
+
+            if (q.choices && Array.isArray(q.choices)) {
+              q.choices.forEach((c, idx) => {
+                if (idx < 4) {
+                  options[idx] =
+                    c.answer || c.text || (typeof c === "string" ? c : "");
+                  if (c.correct === true) correctIndex = idx;
+                }
+              });
+            } else if (q.options && Array.isArray(q.options)) {
+              options = q.options;
+              correctIndex =
+                q.correct_index !== undefined
+                  ? q.correct_index
+                  : q.correct || 0;
+            }
+
+            return {
+              q: q.question || q.text || "",
+              o: options,
+              c: correctIndex,
+              time_limit: q.timeLimit || q.time_limit || 20,
+              image_url: q.image || q.imageUrl || q.image_url || "",
+            };
+          });
+        } else if (Array.isArray(parsedData)) {
+          questionsToLoad = parsedData;
+        }
+
+        if (questionsToLoad.length > 0) {
+          if (
+            confirm(
+              `${questionsToLoad.length} soru bulundu. Mevcut listeyi temizleyip bunları yüklemek istiyor musun?`,
+            )
+          ) {
+            document.getElementById("quiz-title").value = quizTitle;
+            questionsList.innerHTML = "";
+            questionCount = 0;
+            questionsToLoad.forEach((qData) => createQuestionWithData(qData));
+          }
+        } else {
+          alert("Geçerli bir soru formatı bulunamadı.");
+        }
+      }
+
+      function toggleQuestionType(sel, qNum) {
+        const container = document.getElementById(`opts-${qNum}`);
+        const opt2 = container.querySelector(".opt-box-2");
+        const opt3 = container.querySelector(".opt-box-3");
+        if (sel.value === "tf") {
+          opt2.style.display = "none";
+          opt3.style.display = "none";
+          container.querySelector(".q-opt-0").value = "DOĞRU";
+          container.querySelector(".q-opt-1").value = "YANLIŞ";
+        } else {
+          opt2.style.display = "flex";
+          opt3.style.display = "flex";
+          container.querySelector(".q-opt-0").value = "";
+          container.querySelector(".q-opt-1").value = "";
+        }
+      }
+
+      function createQuestionWithData(data) {
+        questionCount++;
+        const div = document.createElement("div");
+        div.className = "glass-card fade-in";
+        div.style =
+          "margin-bottom: 2rem; padding: 1.5rem; border: 1px solid var(--glass-border); background: rgba(0,0,0,0.2);";
+        div.innerHTML = `
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <span style="font-size: 0.9rem; font-weight: 900; color: var(--primary);">SORU #${questionCount}</span>
+                    <div style="display: flex; gap: 0.5rem; align-items: center;">
+                        <label style="font-size: 0.7rem; display: flex; align-items: center; gap: 0.3rem;">
+                            <input type="checkbox" class="is-poll" ${data.is_poll ? "checked" : ""}> 📊 Anket
+                        </label>
+                        <label style="font-size: 0.7rem; display: flex; align-items: center; gap: 0.3rem;">
+                            <input type="checkbox" class="is-super-round" ${data.is_super_round ? "checked" : ""}> ⚡ Süper Tur (3x)
+                        </label>
+                        <select onchange="toggleQuestionType(this, ${questionCount})" style="font-size: 0.7rem; padding: 0.3rem;">
+                            <option value="4-opt">4 Şık</option>
+                            <option value="tf">D / Y</option>
+                        </select>
+                        <button class="btn btn-secondary" onclick="this.parentElement.parentElement.parentElement.remove()" style="padding: 0.3rem 0.6rem; color: var(--accent); border-color: var(--accent);">
+                            <i data-lucide="trash-2" style="width: 14px;"></i>
+                        </button>
+                    </div>
+                </div>
+                
+                <div class="input-group">
+                    <input type="text" class="q-text" value="${data.q || ""}" placeholder="Soru metni..." style="font-size: 1.1rem; font-weight: 700;">
+                </div>
+
+                <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem; margin-top: 1rem;">
+                    <div class="input-group">
+                        <label style="font-size: 0.6rem; opacity: 0.6;">🖼️ GÖRSEL URL (OPSİYONEL)</label>
+                        <input type="text" class="q-image" value="${data.image_url || ""}" placeholder="https://..." style="font-size: 0.8rem; padding: 0.5rem;">
+                    </div>
+                    <div class="input-group">
+                        <label style="font-size: 0.6rem; opacity: 0.6;">🔊 SES URL (OPSİYONEL)</label>
+                        <input type="text" class="q-audio" value="${data.audio_url || ""}" placeholder="https://..." style="font-size: 0.8rem; padding: 0.5rem;">
+                    </div>
+                </div>
+
+                <div id="opts-${questionCount}" style="display: grid; grid-template-columns: 1fr 1fr; gap: 0.75rem; margin-top: 1rem;">
+                    ${[0, 1, 2, 3]
+                      .map(
+                        (i) => `
+                        <div class="opt-box-${i}" style="display: flex; align-items: center; gap: 0.5rem; background: rgba(255,255,255,0.03); padding: 0.5rem; border-radius: 10px;">
+                            <input type="radio" name="correct-${questionCount}" value="${i}" ${i === (data.c || 0) ? "checked" : ""} style="width: 18px; height: 18px;">
+                            <input type="text" class="q-opt-${i}" value="${data.o ? data.o[i] : ""}" placeholder="Şık ${i + 1}" style="padding: 0.5rem; font-size: 0.9rem; text-align: left; border: none; background: transparent;">
+                        </div>
+                    `,
+                      )
+                      .join("")}
+                </div>
+            `;
+        questionsList.appendChild(div);
+        lucide.createIcons();
+      }
+
+      document
+        .getElementById("btn-add-question")
+        .addEventListener("click", () =>
+          createQuestionWithData({ q: "", o: ["", "", "", ""], c: 0 }),
+        );
+
+      document
+        .getElementById("btn-save-quiz")
+        .addEventListener("click", async () => {
+          const title = document.getElementById("quiz-title").value;
+          if (!title) return alert("Lütfen başlık girin.");
+          const forms = document.querySelectorAll(".q-text");
+          if (forms.length === 0) return alert("Soru ekleyin.");
+
+          const pin = "TEMP_" + title;
+          const themeColor = document.getElementById("theme-color").value;
+          const { data: game, error: gameErr } = await client
+            .from("games")
+            .insert([
+              {
+                pin,
+                status: "template",
+                branding_color: themeColor,
+              },
+            ])
+            .select()
+            .single();
+          if (gameErr) return alert(gameErr.message);
+
+          const questionsData = [];
+          const themeStyle = document.getElementById("theme-style")
+            ? document.getElementById("theme-style").value
+            : "default";
+          const isBetEnabled =
+            document.getElementById("is-bet-enabled").checked;
+
+          document
+            .querySelectorAll(".glass-card.fade-in")
+            .forEach((form, idx) => {
+              const text = form.querySelector(".q-text").value;
+              const correct =
+                form.querySelector(`input[name="correct-${idx + 1}"]:checked`)
+                  ?.value || 0;
+              const isPoll = form.querySelector(".is-poll").checked;
+              const isSuperRound =
+                form.querySelector(".is-super-round")?.checked || false;
+              const img = form.querySelector(".q-image").value;
+              const aud = form.querySelector(".q-audio").value;
+
+              const opts = [
+                form.querySelector(".q-opt-0").value,
+                form.querySelector(".q-opt-1").value,
+                form.querySelector(".q-opt-2").value,
+                form.querySelector(".q-opt-3").value,
+              ];
+              questionsData.push({
+                game_id: game.id,
+                question_text: text,
+                options: opts,
+                correct_index: parseInt(correct),
+                is_poll: isPoll,
+                is_super_round: isSuperRound,
+                image_url: img,
+                audio_url: aud,
+              });
+            });
+
+          await client
+            .from("games")
+            .update({
+              theme_style: themeStyle,
+              is_betting_enabled: isBetEnabled,
+            })
+            .eq("id", game.id);
+
+          const { error: qErr } = await client
+            .from("questions")
+            .insert(questionsData);
+          if (!qErr) {
+            alert("Yarışma kaydedildi!");
+            loadSavedQuizzes();
+          } else alert(qErr.message);
+        });
+
+      async function downloadReport() {
+        const { data: games } = await client
+          .from("games")
+          .select("id, pin, created_at")
+          .neq("status", "template")
+          .order("created_at", { ascending: false });
+        if (!games || games.length === 0)
+          return alert("Henüz tamamlanmış yarışma yok.");
+
+        const reportData = [];
+        for (const g of games) {
+          const title = g.pin.replace("TEMP_", "");
+          const date = new Date(g.created_at).toLocaleString("tr-TR");
+          const { data: players } = await client
+            .from("players")
+            .select("nickname, score, team, streak")
+            .eq("game_id", g.id)
+            .order("score", { ascending: false });
+
+          if (players) {
+            players.forEach((p, index) => {
+              reportData.push({
+                "Yarışma": title,
+                "Tarih": date,
+                "Sıralama": index + 1,
+                "Oyuncu": p.nickname,
+                "Takım": p.team || "Bireysel",
+                "Toplam Puan": p.score,
+                "Cevap Serisi": p.streak || 0
+              });
+            });
+          }
+        }
+
+        const wb = XLSX.utils.book_new();
+        const ws = XLSX.utils.json_to_sheet(reportData);
+        
+        // Define column widths
+        ws["!cols"] = [
+          { wch: 25 }, // Yarışma
+          { wch: 20 }, // Tarih
+          { wch: 10 }, // Sıralama
+          { wch: 20 }, // Oyuncu
+          { wch: 15 }, // Takım
+          { wch: 15 }, // Toplam Puan
+          { wch: 15 }  // Cevap Serisi
+        ];
+
+        XLSX.utils.book_append_sheet(wb, ws, "Fahot_Rapor");
+        XLSX.writeFile(wb, `Fahot_Rapor_${new Date().toISOString().split("T")[0]}.xlsx`);
+      }
+
+      loadStats();
+      loadSavedQuizzes();
+      createQuestionWithData({ q: "", o: ["", "", "", ""], c: 0 });
+    </script>
+  </body>
+</html>

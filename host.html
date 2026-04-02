@@ -1,0 +1,252 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizPulse - Host Lobi</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <script src="https://cdn.jsdelivr.net/npm/qrcode@1.5.1/build/qrcode.min.js"></script>
+    <style>
+        .lobby-code {
+            font-size: 6rem;
+            font-weight: 900;
+            color: var(--primary);
+            text-shadow: 0 0 40px var(--primary-glow);
+            letter-spacing: 0.15em;
+            margin: 1rem 0;
+            animation: pulse-code 2s infinite alternate;
+        }
+        @keyframes pulse-code {
+            0% { transform: scale(1); filter: brightness(1); }
+            100% { transform: scale(1.05); filter: brightness(1.2); }
+        }
+        .qr-card {
+            background: white;
+            padding: 1.5rem;
+            border-radius: 24px;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.3);
+            display: inline-block;
+        }
+        .player-tag {
+            background: linear-gradient(135deg, rgba(255,255,255,0.1) 0%, rgba(255,255,255,0.02) 100%);
+            border: 1px solid var(--glass-border);
+            padding: 1rem;
+            border-radius: 16px;
+            font-weight: 800;
+            font-size: 1.1rem;
+            animation: slideInPop 0.6s cubic-bezier(0.34, 1.56, 0.64, 1);
+            box-shadow: 0 10px 20px rgba(0,0,0,0.2);
+            transition: all 0.3s ease;
+        }
+        .player-tag:hover {
+            transform: translateY(-5px) scale(1.05);
+            box-shadow: 0 15px 30px rgba(0,0,0,0.4);
+            border-color: var(--primary);
+        }
+        @keyframes slideInPop {
+            0% { transform: translateY(50px) scale(0.5); opacity: 0; }
+            100% { transform: translateY(0) scale(1); opacity: 1; }
+        }
+        @keyframes popIn {
+            0% { transform: scale(0); opacity: 0; }
+            100% { transform: scale(1); opacity: 1; }
+        }
+        @keyframes emojiFloat {
+            0% { transform: translateY(0) scale(0.5); opacity: 0; }
+            10% { opacity: 1; }
+            90% { opacity: 1; }
+            100% { transform: translateY(-120vh) scale(2); opacity: 0; }
+        }
+        .floating-emoji {
+            position: fixed;
+            bottom: -50px;
+            z-index: 2000;
+            font-size: 4rem;
+            pointer-events: none;
+            animation: emojiFloat 4s ease-out forwards;
+        }
+    </style>
+</head>
+<body>
+    <div class="brand-logo" style="position: absolute; top: 1.5rem; left: 2rem;">
+        <img src="logo.png" alt="FAHOT" style="height: 60px; filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.4));">
+    </div>
+    <div id="reaction-container"></div>
+    <div class="bg-blobs">
+        <div class="blob"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="container fade-in" style="max-width: 1000px;">
+        <div style="display: grid; grid-template-columns: 1.2fr 0.8fr; gap: 3rem; align-items: center;">
+            <div style="text-align: left;">
+                <h1 style="font-size: 4rem;">Lobi Açıldı</h1>
+                <p class="subtitle">Oyuncular bekleniyor... Sen de katıl!</p>
+                
+                <div class="glass-card" style="padding: 2.5rem; border-color: var(--primary);">
+                    <p style="text-transform: uppercase; letter-spacing: 0.2em; font-size: 0.8rem; color: var(--text-muted);">GİRİŞ KODU</p>
+                    <div class="lobby-code" id="code-display">------</div>
+                    
+                    <div style="margin-top: 2rem; padding-top: 2rem; border-top: 1px solid var(--glass-border);">
+                        <p style="font-size: 0.9rem; color: var(--text-muted); margin-bottom: 1rem;">ARKADAŞLARINI DAVET ET:</p>
+                        <div style="display: flex; gap: 1rem;">
+                            <button class="btn" id="btn-copy-link" style="flex: 1;">
+                                <i data-lucide="copy"></i> Linki Kopyala
+                            </button>
+                            <button class="btn btn-secondary" id="btn-start" style="flex: 1; border-color: var(--success); color: var(--success);">
+                                <i data-lucide="play"></i> Başlat
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
+                <div class="glass-card" style="margin-top: 1.5rem; padding: 1rem; border-color: var(--accent); background: rgba(244, 63, 94, 0.05);">
+                    <p style="font-size: 0.85rem;">
+                        <i data-lucide="globe" style="width: 14px; vertical-align: middle;"></i>
+                        <strong>Online Erişmek İçin:</strong> Bu klasörü Netlify'a sürükle ve gerçek bir web siten olsun!
+                    </p>
+                </div>
+            </div>
+
+            <div style="text-align: center;">
+                <div class="qr-card">
+                    <canvas id="qrcode"></canvas>
+                </div>
+                <p style="margin-top: 1.5rem; font-weight: 600; color: var(--text-muted);">HIZLI KATILIM İÇİN TARAT</p>
+            </div>
+        </div>
+
+        <div class="stats-grid" id="players-list" style="grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); margin-top: 3rem;">
+            <!-- Oyuncular buraya dökülecek -->
+        </div>
+
+        <!-- PLAYER COUNT BADGE -->
+        <div id="player-count-badge" style="position: fixed; top: 30px; right: 30px; background: var(--glass-bg); padding: 1rem 1.5rem; border-radius: 50px; border: 1px solid var(--glass-border); display: flex; align-items: center; gap: 0.75rem; box-shadow: 0 10px 30px rgba(0,0,0,0.2); animation: popIn 0.5s ease;">
+            <i data-lucide="users" style="color: var(--primary); width: 20px;"></i>
+            <span style="font-size: 1.2rem; font-weight: 800;"><span id="total-count">0</span> Oyuncu</span>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const client = window.supabaseClient;
+        const codeDisplay = document.getElementById('code-display');
+        const playersList = document.getElementById('players-list');
+        const btnStart = document.getElementById('btn-start');
+        const urlParams = new URLSearchParams(window.location.search);
+        const templateId = urlParams.get('templateId');
+
+        let gameId = null;
+        let gamePin = Math.floor(100000 + Math.random() * 900000).toString();
+        
+        async function initHost() {
+            const { data, error } = await client.from('games').insert([{ pin: gamePin, status: 'waiting' }]).select().single();
+            if (error) return alert('Hata oluştu.');
+            
+            gameId = data.id;
+            codeDisplay.textContent = gamePin;
+
+            // Online veya yerel ağda otomatik olarak doğru URL kullanılır
+            const joinURL = `${window.location.origin}/index.html?pin=${gamePin}`;
+            
+            QRCode.toCanvas(document.getElementById('qrcode'), joinURL, { width: 220, margin: 1 });
+
+            document.getElementById('btn-copy-link').onclick = () => {
+                const temp = document.createElement('input');
+                temp.value = joinURL;
+                document.body.appendChild(temp);
+                temp.select();
+                document.execCommand('copy');
+                document.body.removeChild(temp);
+                
+                const btn = document.getElementById('btn-copy-link');
+                const old = btn.innerHTML;
+                btn.innerHTML = '<i data-lucide="check"></i> Kopyalandı!';
+                setTimeout(() => { btn.innerHTML = old; lucide.createIcons(); }, 2000);
+                lucide.createIcons();
+            };
+
+            if (templateId) {
+                const { data: tData } = await client.from('games').select('branding_color, theme_style, is_betting_enabled').eq('id', templateId).single();
+                if (tData) {
+                    if (tData.branding_color) document.documentElement.style.setProperty('--primary', tData.branding_color);
+                    await client.from('games').update({ 
+                        branding_color: tData.branding_color || '#7c3aed',
+                        theme_style: tData.theme_style || 'default',
+                        is_betting_enabled: tData.is_betting_enabled || false
+                    }).eq('id', gameId);
+                }
+
+                const { data: qTemp } = await client.from('questions').select('*').eq('game_id', templateId);
+                if (qTemp) {
+                    const newQs = qTemp.map(q => ({ 
+                        game_id: gameId, 
+                        question_text: q.question_text, 
+                        options: q.options, 
+                        correct_index: q.correct_index,
+                        time_limit: q.time_limit || 20,
+                        is_poll: q.is_poll || false,
+                        image_url: q.image_url || '',
+                        audio_url: q.audio_url || ''
+                    }));
+                    await client.from('questions').insert(newQs);
+                }
+            }
+
+            // Join Sound
+            const joinSound = new Audio('https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3');
+
+            let playerCount = 0;
+            client.channel('players').on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'players', filter: `game_id=eq.${gameId}` }, (p) => {
+                joinSound.play();
+                playerCount++;
+                document.getElementById('total-count').textContent = playerCount;
+                
+                const div = document.createElement('div');
+                div.className = 'player-tag';
+                const pid = p.new.id;
+                div.innerHTML = `<span>${p.new.avatar || '\ud83d\udc64'}</span> ${p.new.nickname} <button onclick="banPlayer('${pid}', this)" title="Lobiden Çıkar" style="background:rgba(244,63,94,0.25);border:1px solid var(--accent);color:var(--accent);width:22px;height:22px;border-radius:50%;cursor:pointer;font-size:0.75rem;margin-left:0.5rem;vertical-align:middle;line-height:1;">&#x2715;</button>`;
+                playersList.appendChild(div);
+            }).subscribe();
+
+            window.banPlayer = async (pid, btn) => {
+                await client.from('players').update({ score: -9999, nickname: '[\u00c7IKARILDI]' }).eq('id', pid);
+                const card = btn.parentElement;
+                if (card) { card.style.opacity = '0.3'; card.style.textDecoration = 'line-through'; }
+                playerCount = Math.max(0, playerCount - 1);
+                document.getElementById('total-count').textContent = playerCount;
+            };
+
+            setupReactions();
+        }
+
+        function setupReactions() {
+            client.channel('reactions').on('postgres_changes', { 
+                event: 'INSERT', schema: 'public', table: 'reactions', filter: `game_id=eq.${gameId}` 
+            }, (p) => {
+                const emoji = p.new.emoji;
+                const el = document.createElement('div');
+                el.className = 'floating-emoji';
+                el.innerText = emoji;
+                el.style.left = Math.random() * 90 + 5 + '%';
+                document.getElementById('reaction-container').appendChild(el);
+                setTimeout(() => el.remove(), 3000);
+            }).subscribe();
+        }
+
+        btnStart.onclick = async () => {
+            await client.from('games').update({ status: 'in_progress' }).eq('id', gameId);
+            window.location.href = `host-quiz.html?gameId=${gameId}`;
+        };
+
+        if (window.location.protocol === 'file:') {
+            console.warn("Dosya sistemi üzerinden çalışıyor, QR kod yerel bağlantı içerir.");
+        }
+
+        initHost();
+    </script>
+</body>
+</html>

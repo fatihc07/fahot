@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="tr">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>QuizPulse - Canlı Yarışma</title>
+    <link rel="stylesheet" href="styles.css">
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+</head>
+<body>
+    <div class="bg-blobs">
+        <div class="blob"></div>
+        <div class="blob blob-2"></div>
+    </div>
+
+    <div class="container fade-in">
+        <div class="brand-logo" style="justify-content: center; margin-bottom: 2rem; width: 100%;">
+            <img src="logo.png" alt="FAHOT" style="height: 120px; filter: drop-shadow(0 0 15px rgba(99, 102, 241, 0.4));">
+        </div>
+        <p class="subtitle">Eğlence başlasın, hemen katıl!</p>
+        
+        <div class="glass-card" id="join-card">
+            <div class="input-group">
+                <label>GİRİŞ KODU</label>
+                <input type="text" id="game-pin" placeholder="000 000" maxlength="6" autocomplete="off">
+            </div>
+            <button class="btn" id="btn-join">
+                <span>Katıl</span>
+                <i data-lucide="arrow-right"></i>
+            </button>
+        </div>
+
+        <div class="glass-card" id="name-card" style="display: none;">
+            <div class="input-group">
+                <label>ADINIZ</label>
+                <input type="text" id="player-name" placeholder="Takma adın" maxlength="15" autocomplete="off" style="text-align: center;">
+            </div>
+
+            <label style="display: block; margin-top: 1.5rem; margin-bottom: 0.5rem; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">TAKIM SEÇ</label>
+            <div id="team-selector" style="display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; margin-bottom: 1.5rem;">
+                <button class="team-btn selected" onclick="selectTeam('Bireysel', this)" style="background: rgba(255,255,255,0.05); color: white; border: 1px solid var(--glass-border); padding: 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">👤 Bireysel</button>
+                <button class="team-btn" onclick="selectTeam('Kırmızı', this)" style="background: rgba(239, 68, 68, 0.1); color: #ef4444; border: 1px solid #ef4444; padding: 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">🔴 Kırmızı</button>
+                <button class="team-btn" onclick="selectTeam('Mavi', this)" style="background: rgba(59, 130, 246, 0.1); color: #3b82f6; border: 1px solid #3b82f6; padding: 0.5rem; border-radius: 10px; font-size: 0.75rem; font-weight: 700;">🔵 Mavi</button>
+            </div>
+
+            <label style="display: block; margin-top: 1.5rem; margin-bottom: 0.5rem; font-size: 0.8rem; font-weight: 700; color: var(--text-muted); text-transform: uppercase;">AVATARINI SEÇ</label>
+            <div id="avatar-grid" style="display: grid; grid-template-columns: repeat(4, 1fr); gap: 0.75rem; margin-bottom: 2rem;">
+                <!-- Avatarlar JS ile gelecek -->
+            </div>
+
+            <button class="btn" id="btn-ready">
+                <span>Hazırım!</span>
+                <i data-lucide="play-circle"></i>
+            </button>
+            <button class="btn btn-secondary" id="btn-back" style="margin-top: 1rem;">
+                Geri Dön
+            </button>
+        </div>
+    </div>
+
+    <script>
+        lucide.createIcons();
+        const client = window.supabaseClient;
+        const urlParams = new URLSearchParams(window.location.search);
+
+        const joinCard = document.getElementById('join-card');
+        const nameCard = document.getElementById('name-card');
+        const btnJoin = document.getElementById('btn-join');
+        const btnReady = document.getElementById('btn-ready');
+        const btnBack = document.getElementById('btn-back');
+        const avatarGrid = document.getElementById('avatar-grid');
+
+        let currentGameId = null;
+        let selectedAvatar = '👤';
+        let selectedTeam = 'Bireysel';
+        const avatars = ['🦊', '🐱', '🐶', '🐸', '🐼', '🐨', '🐯', '🦁'];
+
+        function renderAvatars() {
+            avatarGrid.innerHTML = avatars.map(av => `
+                <div class="avatar-item" onclick="selectAvatar('${av}')" style="font-size: 2rem; padding: 0.5rem; border-radius: 12px; cursor: pointer; border: 2px solid transparent; text-align: center; transition: all 0.2s;">
+                    ${av}
+                </div>
+            `).join('');
+            selectAvatar(avatars[0]);
+        }
+
+        window.selectTeam = (team, btn) => {
+            selectedTeam = team;
+            document.querySelectorAll('.team-btn').forEach(el => {
+                el.classList.remove('selected');
+                el.style.borderWidth = '1px';
+            });
+            btn.classList.add('selected');
+            btn.style.borderWidth = '3px';
+        };
+
+        window.selectAvatar = (av) => {
+            selectedAvatar = av;
+            document.querySelectorAll('.avatar-item').forEach(el => {
+                const isSelected = el.innerText.trim() === av;
+                el.style.borderColor = isSelected ? 'var(--primary)' : 'transparent';
+                el.style.background = isSelected ? 'rgba(124, 58, 237, 0.1)' : 'transparent';
+                if(isSelected) el.classList.add('bounce-in');
+                else el.classList.remove('bounce-in');
+            });
+        };
+
+        async function checkAutoJoin() {
+            const pinParam = urlParams.get('pin');
+            if (pinParam) {
+                document.getElementById('game-pin').value = pinParam;
+                handleJoin(pinParam);
+            }
+        }
+
+        async function handleJoin(pin) {
+            if (pin.length >= 4) {
+                const { data, error } = await client.from('games').select('id').eq('pin', pin).eq('status', 'waiting').single();
+                if (data) {
+                    currentGameId = data.id;
+                    joinCard.style.display = 'none';
+                    nameCard.style.display = 'flex';
+                    renderAvatars();
+                } else {
+                    if (urlParams.get('pin')) alert('Bağlantıdaki oyun kodu geçersiz veya oyun zaten başladı.');
+                    else alert('Geçersiz oyun kodu veya oyun zaten başladı.');
+                }
+            } else {
+                alert('Lütfen geçerli bir oyun kodu girin.');
+            }
+        }
+
+        btnJoin.addEventListener('click', () => {
+            const pin = document.getElementById('game-pin').value;
+            handleJoin(pin);
+        });
+
+        btnBack.addEventListener('click', () => {
+            nameCard.style.display = 'none';
+            joinCard.style.display = 'flex';
+        });
+
+        btnReady.addEventListener('click', async () => {
+            const name = document.getElementById('player-name').value;
+            if (name && currentGameId) {
+                const { data, error } = await client.from('players').insert([{ 
+                    game_id: currentGameId, 
+                    nickname: name,
+                    avatar: selectedAvatar,
+                    team: selectedTeam 
+                }]).select().single();
+
+                if (!error) {
+                    client.channel('game-status').on('postgres_changes', { 
+                        event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${currentGameId}` 
+                    }, (p) => {
+                        if (p.new.status === 'in_progress') {
+                            window.location.href = `quiz.html?gameId=${currentGameId}&playerId=${data.id}`;
+                        }
+                    }).subscribe();
+
+                    document.body.innerHTML = `
+                        <div class="container fade-in">
+                            <div class="glass-card" style="text-align: center; border-bottom: 4px solid var(--primary);">
+                                <div style="font-size: 5rem; margin-bottom: 1rem;">${selectedAvatar}</div>
+                                <h1>Harika! ${name}</h1>
+                                <p class="subtitle">Takımın: <span style="color:var(--primary)">${selectedTeam}</span></p>
+                                <p class="subtitle">Ekranda ismini ara, yarış başlıyor!</p>
+                                <div style="margin-top: 2rem; background: rgba(0,0,0,0.1); padding: 1.5rem; border-radius: 20px;">
+                                    <p style="color: var(--text-muted);">Hazırlan...</p>
+                                    <div style="font-size: 2rem; margin-top: 1rem; animation: bounce 1s infinite alternate;">🚀</div>
+                                </div>
+                            </div>
+                        </div>
+                    `;
+                } else {
+                    alert(error.message);
+                }
+            } else {
+                alert('Lütfen bir takma ad girin.');
+            }
+        });
+
+        checkAutoJoin();
+    </script>
+</body>
+</html>

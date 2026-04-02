@@ -1,0 +1,620 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuizPulse - Soru (Host)</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+      .host-question-card {
+        max-width: 1000px !important;
+        text-align: center;
+      }
+      .question-text {
+        font-size: 3rem;
+        font-weight: 800;
+        margin-bottom: 2.5rem;
+      }
+
+      .timer-circle {
+        width: 120px;
+        height: 120px;
+        border: 10px solid var(--primary);
+        border-radius: 50%;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        font-size: 3rem;
+        font-weight: 900;
+        margin: 0 auto 2rem;
+        position: relative;
+        background: rgba(0, 0, 0, 0.2);
+        box-shadow: 0 0 30px var(--primary-glow);
+      }
+
+      .chart-container {
+        display: none;
+        height: 400px;
+        align-items: flex-end;
+        justify-content: center;
+        gap: 2rem;
+        margin-top: 2rem;
+        padding: 2rem;
+        background: rgba(0, 0, 0, 0.2);
+        border-radius: 24px;
+      }
+      .chart-bar {
+        width: 80px;
+        background: var(--primary);
+        border-radius: 12px 12px 4px 4px;
+        position: relative;
+        transition: height 1s cubic-bezier(0.175, 0.885, 0.32, 1.275);
+        min-height: 20px;
+      }
+      .bar-label {
+        position: absolute;
+        bottom: -35px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-weight: 800;
+      }
+      .bar-count {
+        position: absolute;
+        top: -35px;
+        left: 50%;
+        transform: translateX(-50%);
+        font-weight: 800;
+        font-size: 1.5rem;
+      }
+
+      .host-answers {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        width: 100%;
+      }
+      .answer-row {
+        display: flex;
+        align-items: center;
+        background: var(--glass-bg);
+        border: 1px solid var(--glass-border);
+        border-radius: 18px;
+        padding: 1.5rem;
+        font-size: 1.8rem;
+        font-weight: 700;
+        text-align: left;
+      }
+      .answer-shape {
+        width: 45px;
+        height: 45px;
+        margin-right: 1.5rem;
+        border-radius: 10px;
+      }
+      .correct-mark {
+        border: 4px solid #22c55e !important;
+        box-shadow: 0 0 20px rgba(34, 197, 94, 0.4);
+      }
+      .wrong-mark {
+        opacity: 0.3;
+      }
+
+      .answer-count-float {
+        position: fixed;
+        top: 100px;
+        right: 50px;
+        background: var(--glass-bg);
+        padding: 1.5rem;
+        border-radius: 20px;
+        text-align: center;
+        border: 1px solid var(--glass-border);
+      }
+
+      @keyframes emojiFloat {
+        0% {
+          transform: translateY(0) scale(0.5);
+          opacity: 0;
+        }
+        10% {
+          opacity: 1;
+        }
+        90% {
+          opacity: 1;
+        }
+        100% {
+          transform: translateY(-120vh) scale(2);
+          opacity: 0;
+        }
+      }
+      .floating-emoji {
+        position: fixed;
+        bottom: -50px;
+        z-index: 2000;
+        font-size: 4rem;
+        pointer-events: none;
+        animation: emojiFloat 4s ease-out forwards;
+      }
+    </style>
+  </head>
+  <body>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <div
+      class="brand-logo"
+      style="
+        position: absolute;
+        top: 1.5rem;
+        left: 2rem;
+        z-index: 200;
+      "
+    >
+      <img src="logo.png" alt="FAHOT" style="height: 50px; filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.4));">
+    </div>
+    <div id="reaction-container"></div>
+    <div class="bg-blobs">
+      <div class="blob"></div>
+      <div class="blob blob-2"></div>
+    </div>
+
+    <div class="answer-count-float">
+      <p
+        style="
+          font-size: 0.8rem;
+          color: var(--text-muted);
+          text-transform: uppercase;
+        "
+      >
+        Cevaplar
+      </p>
+      <h2 id="answered-count" style="font-size: 2.5rem">0</h2>
+      <button
+        class="btn btn-secondary"
+        style="margin-top: 1rem; font-size: 0.6rem; padding: 0.3rem"
+        onclick="location.href = `results.html?gameId=${gameId}&final=true`"
+      >
+        🔴 ERKEN BİTİR
+      </button>
+    </div>
+
+    <div class="container host-question-card">
+      <!-- Get Ready Overlay -->
+      <div
+        id="get-ready-overlay"
+        style="
+          position: absolute;
+          top: 0;
+          left: 0;
+          width: 100%;
+          height: 100%;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          z-index: 100;
+          background: var(--bg-dark);
+          border-radius: 24px;
+        "
+      >
+        <h1 style="font-size: 4rem; margin-bottom: 1rem">HAZIRLAN!</h1>
+        <div
+          id="ready-timer"
+          style="font-size: 8rem; font-weight: 900; color: var(--primary)"
+        >
+          3
+        </div>
+        <p class="subtitle" id="ready-q-index">Soru 1 geliyor...</p>
+        <div
+          id="double-points-banner"
+          style="
+            display: none;
+            margin-top: 1.5rem;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            padding: 1rem 2.5rem;
+            border-radius: 50px;
+            font-size: 1.8rem;
+            font-weight: 900;
+            letter-spacing: 0.05em;
+            animation: pulse-code 1s infinite alternate;
+            box-shadow: 0 0 40px rgba(245, 158, 11, 0.6);
+          "
+        >
+          ⚡ SON SORU — 2X PUAN ⚡
+        </div>
+      </div>
+
+      <div id="quiz-ui" style="display: none">
+        <div
+          id="double-points-quiz-badge"
+          style="
+            display: none;
+            background: linear-gradient(135deg, #f59e0b, #ef4444);
+            color: white;
+            padding: 0.5rem 1.5rem;
+            border-radius: 50px;
+            font-size: 1rem;
+            font-weight: 900;
+            margin-bottom: 2rem;
+            display: inline-block;
+            animation: pulse-code 1s infinite alternate;
+            box-shadow: 0 0 20px rgba(245, 158, 11, 0.5);
+          "
+        >
+          ⚡ SON SORU — 2X PUAN ⚡
+        </div>
+
+        <!-- IMAGE CONTAINER -->
+        <div
+          id="q-image-container"
+          style="display: none; margin: 0 auto 2rem; max-width: 600px"
+        ></div>
+
+        <div class="timer-circle" id="countdown">20</div>
+        <div class="question-text" id="q-text">Yükleniyor...</div>
+
+        <div class="host-answers" id="answers-grid">
+          <!-- Cevaplar gelecek -->
+        </div>
+      </div>
+
+      <div id="chart-ui" style="display: none">
+        <h1 style="margin-bottom: 2rem">Sonuçlar</h1>
+        <div class="chart-container" id="chart-bars" style="display: flex">
+          <!-- Grafikler gelecek -->
+        </div>
+        <button
+          class="btn"
+          id="btn-to-leaderboard"
+          style="margin-top: 4rem; max-width: 300px; margin-inline: auto"
+        >
+          Sıralamayı Gör <i data-lucide="trophy"></i>
+        </button>
+      </div>
+    </div>
+
+    <script>
+      lucide.createIcons();
+      const client = window.supabaseClient;
+      const params = new URLSearchParams(window.location.search);
+      const gameId = params.get("gameId");
+
+      const SOUNDS = {
+        tick: new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3",
+        ),
+        chart: new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3",
+        ),
+        pop: new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3",
+        ),
+      };
+
+      let questions = [];
+      let currentIndex = parseInt(params.get("index")) || 0;
+      let timeLeft = 20;
+      let timer;
+      let totalPlayers = 0;
+      let answerCount = 0;
+      let currentCorrectIdx = 0;
+      let isPoll = false;
+
+      function applyTheme(style) {
+        document.body.className = "theme-" + style;
+        if (style === "oled") {
+          document.documentElement.style.setProperty("--bg-dark", "#000");
+          document.body.style.background = "#000";
+        } else if (style === "cyberpunk") {
+          document.documentElement.style.setProperty("--primary", "#00ff41");
+          document.documentElement.style.setProperty(
+            "--primary-glow",
+            "rgba(0, 255, 65, 0.5)",
+          );
+          document.body.style.filter = "contrast(1.2) saturate(1.2)";
+          document.body.style.textShadow = "0 0 5px var(--primary-glow)";
+        } else if (style === "retro") {
+          document.body.style.fontFamily = '"Courier New", monospace';
+          document.body.style.imageRendering = "pixelated";
+        }
+      }
+
+      async function init() {
+        const { data: gData } = await client
+          .from("games")
+          .select("branding_color, theme_style")
+          .eq("id", gameId)
+          .single();
+        if (gData) {
+          if (gData.branding_color)
+            document.documentElement.style.setProperty(
+              "--primary",
+              gData.branding_color,
+            );
+          applyTheme(gData.theme_style);
+        }
+
+        const { count } = await client
+          .from("players")
+          .select("*", { count: "exact", head: true })
+          .eq("game_id", gameId);
+        totalPlayers = count || 0;
+
+        const { data: qs } = await client
+          .from("questions")
+          .select("*")
+          .eq("game_id", gameId);
+        questions = qs;
+
+        if (questions[currentIndex]) {
+          const q = questions[currentIndex];
+          currentCorrectIdx = q.correct_index;
+          isPoll = q.is_poll || false;
+
+          const isLastQuestion = currentIndex === questions.length - 1;
+          const isSuperQ = q.is_super_round || false;
+          document.getElementById("q-text").textContent = q.question_text;
+          document.getElementById("ready-q-index").textContent =
+            `Soru ${currentIndex + 1} / ${questions.length}`;
+
+          // Banner’ları göster
+          if (isLastQuestion || isSuperQ) {
+            const badge = document.getElementById("double-points-banner");
+            const qbadge = document.getElementById("double-points-quiz-badge");
+            if (isSuperQ) {
+              [badge, qbadge].forEach((el) => {
+                if (el) {
+                  el.style.display = "inline-block";
+                  el.textContent = "⚡ SÜPER TUR — 3X PUAN ⚡";
+                  el.style.background =
+                    "linear-gradient(135deg,#a855f7,#6366f1)";
+                }
+              });
+            } else {
+              [badge, qbadge].forEach((el) => {
+                if (el) {
+                  el.style.display = "inline-block";
+                  el.textContent = "⚡ SON SORU — 2X PUAN ⚡";
+                }
+              });
+            }
+          }
+
+          // Geri sayım müziği
+          const bgMusic = new Audio(
+            "https://assets.mixkit.co/music/preview/mixkit-game-show-suspense-waiting-667-preview.mp3",
+          );
+          bgMusic.volume = 0.3;
+          bgMusic.play().catch(() => {});
+          setTimeout(() => bgMusic.pause(), 5000);
+
+          // Render Image if exists
+          if (q.image_url) {
+            const imgDiv = document.getElementById("q-image-container");
+            if (imgDiv) {
+              imgDiv.style.display = "block";
+              imgDiv.innerHTML = `<img src="${q.image_url}" style="width: 100%; max-height: 350px; object-fit: contain; border-radius: 16px; box-shadow: 0 10px 40px rgba(0,0,0,0.5); border: 1px solid rgba(255,255,255,0.1);">`;
+            }
+          }
+
+          // Play Audio if exists
+          if (q.audio_url) {
+            const aud = new Audio(q.audio_url);
+            aud.play().catch((e) => console.log("Audio block:", e));
+          }
+
+          document.getElementById("answers-grid").innerHTML = q.options
+            .map((opt, i) => {
+              if (!opt || opt.trim() === "") return ""; // Skip empty opts
+              return `
+                        <div class="answer-row" id="answer-${i}">
+                            <div class="answer-shape" style="background: ${getAnswerColor(i)};"></div>
+                            <span>${opt}</span>
+                        </div>
+                    `;
+            })
+            .join("");
+
+          await client
+            .from("games")
+            .update({
+              current_question_index: currentIndex,
+              status: "in_progress",
+            })
+            .eq("id", gameId);
+
+          listenToAnswers();
+          const { data: initialResps } = await client
+            .from("responses")
+            .select("id")
+            .eq("game_id", gameId)
+            .eq("question_index", currentIndex);
+          if (initialResps) {
+            answerCount = initialResps.length;
+            document.getElementById("answered-count").textContent = answerCount;
+          }
+
+          setupReactions();
+
+          let readyTime = 3;
+          const rt = document.getElementById("ready-timer");
+          const countdownInterval = setInterval(() => {
+            readyTime--;
+            rt.textContent = readyTime;
+            if (readyTime >= 0) SOUNDS.tick.cloneNode(true).play();
+            if (readyTime <= 0) {
+              clearInterval(countdownInterval);
+              startQuestionSession(q.time_limit || 20);
+            }
+          }, 1000);
+        }
+      }
+
+      function setupReactions() {
+        client
+          .channel("reactions")
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "reactions",
+              filter: `game_id=eq.${gameId}`,
+            },
+            (p) => {
+              const emoji = p.new.emoji;
+              const el = document.createElement("div");
+              el.className = "floating-emoji";
+              el.innerText = emoji;
+              el.style.left = Math.random() * 90 + 5 + "%";
+              document.getElementById("reaction-container").appendChild(el);
+              setTimeout(() => el.remove(), 3000);
+            },
+          )
+          .subscribe();
+      }
+
+      function startQuestionSession(sec) {
+        document.getElementById("get-ready-overlay").style.display = "none";
+        document.getElementById("quiz-ui").style.display = "block";
+        startTimer(sec);
+      }
+
+      function startTimer(sec) {
+        timeLeft = sec;
+        document.getElementById("countdown").textContent = timeLeft;
+        timer = setInterval(() => {
+          timeLeft--;
+          document.getElementById("countdown").textContent = timeLeft;
+          if (timeLeft <= 5 && timeLeft > 0) SOUNDS.tick.cloneNode(true).play();
+          if (timeLeft <= 0) {
+            finishQuestion();
+          }
+        }, 1000);
+      }
+
+      function listenToAnswers() {
+        // Unique channel name for consistency
+        const channel = client.channel(`answers-${gameId}-${currentIndex}`);
+        channel
+          .on(
+            "postgres_changes",
+            {
+              event: "INSERT",
+              schema: "public",
+              table: "responses",
+              filter: `game_id=eq.${gameId}`,
+            },
+            (p) => {
+              // Loose equality check to handle string/number differences
+              if (p.new.question_index == currentIndex) {
+                answerCount++;
+                const countEl = document.getElementById("answered-count");
+                if (countEl) countEl.textContent = answerCount;
+
+                // Early finish if everyone answered
+                if (totalPlayers > 0 && answerCount >= totalPlayers) {
+                  finishQuestion();
+                }
+              }
+            },
+          )
+          .subscribe();
+      }
+
+      async function finishQuestion() {
+        if (window.isFinishing) return; // Prevent double trigger
+        window.isFinishing = true;
+
+        clearInterval(timer);
+
+        // Soru bittiğinde oyuncuların ekranlarını sonuç ekranına itmek için bildirim yolla
+        await client
+          .from("games")
+          .update({ status: "question_ended" })
+          .eq("id", gameId);
+
+        // 1. REVEAL CORRECT ANSWER FIRST (IN THE GRID) - Skip if it's a poll
+        if (!isPoll) {
+          const correctRow = document.getElementById(
+            `answer-${currentCorrectIdx}`,
+          );
+          if (correctRow) {
+            correctRow.classList.add("correct-mark");
+            // Dim others
+            document.querySelectorAll(".answer-row").forEach((row, i) => {
+              if (i !== currentCorrectIdx) row.classList.add("wrong-mark");
+            });
+          }
+          // Play reveal sound
+          try {
+            SOUNDS.pop.play().catch(() => {});
+            // CONFETTI BLAST
+            confetti({
+              particleCount: 100,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          } catch (e) {}
+          // Dramatic wait
+          await new Promise((r) => setTimeout(r, 2500));
+        }
+
+        // 3. SHOW CHART UI
+        try {
+          SOUNDS.chart.play().catch(() => {});
+        } catch (e) {}
+        document.getElementById("quiz-ui").style.display = "none";
+        document.getElementById("chart-ui").style.display = "block";
+        if (isPoll)
+          document.querySelector("#chart-ui h1").textContent = "Kamuoyu Görüşü";
+
+        const { data: resp } = await client
+          .from("responses")
+          .select("selected_option")
+          .eq("game_id", gameId)
+          .eq("question_index", currentIndex);
+        const stats = [0, 0, 0, 0];
+        if (resp) resp.forEach((r) => stats[r.selected_option]++);
+
+        const max = Math.max(...stats, 1);
+        const shapes = ['▲', '♦', '●', '■'];
+        const chartHtml = stats
+          .map(
+            (count, i) => `
+                <div class="chart-bar" style="height: ${
+                  (count / max) * 300 + 20
+                }px; background: ${getAnswerColor(i)}; ${
+                  i === currentCorrectIdx
+                    ? 'box-shadow: 0 0 40px ' + getAnswerColor(i) + ';'
+                    : 'opacity: 0.8;'
+                }">
+                    <div class="bar-count">${count}</div>
+                    <div class="bar-label" style="font-size: 2rem;">${shapes[i]}</div>
+                </div>
+            `,
+          )
+          .join("");
+        document.getElementById("chart-bars").innerHTML = chartHtml;
+        lucide.createIcons();
+      }
+
+      document.getElementById("btn-to-leaderboard").onclick = async () => {
+        await client
+          .from("games")
+          .update({ status: "leaderboard" })
+          .eq("id", gameId);
+        const isLast = currentIndex >= questions.length - 1;
+        const nextUrl = isLast
+          ? `results.html?gameId=${gameId}&final=true`
+          : `results.html?gameId=${gameId}&next=${currentIndex + 1}`;
+        window.location.href = nextUrl;
+      };
+
+      function getAnswerColor(i) {
+        return ["#ef4444", "#3b82f6", "#eab308", "#10b981"][i];
+      }
+
+      init();
+    </script>
+  </body>
+</html>

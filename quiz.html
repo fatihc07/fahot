@@ -1,0 +1,762 @@
+<!doctype html>
+<html lang="tr">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>QuizPulse - Yarışıyor</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="supabase-client.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/canvas-confetti@1.5.1/dist/confetti.browser.min.js"></script>
+    <style>
+      .quiz-container {
+        max-width: 800px;
+      }
+      .option-grid {
+        display: grid;
+        grid-template-columns: 1fr 1fr;
+        gap: 1.5rem;
+        margin-top: 2rem;
+      }
+      .answer-btn {
+        height: 180px;
+        border: none;
+        border-radius: 24px;
+        cursor: pointer;
+        transition: all 0.2s cubic-bezier(0.4, 0, 0.2, 1);
+        position: relative;
+        display: flex;
+        align-items: center;
+        justify-content: center;
+        box-shadow: 0 8px 0 rgba(0, 0, 0, 0.2);
+      }
+      .answer-btn:hover {
+        transform: translateY(-3px);
+        filter: brightness(1.1);
+      }
+      .answer-btn:active {
+        transform: translateY(5px);
+        box-shadow: none;
+      }
+
+      .btn-0 {
+        background: #ef4444;
+      } /* Red Triangle */
+      .btn-1 {
+        background: #3b82f6;
+      } /* Blue Diamond */
+      .btn-2 {
+        background: #eab308;
+      } /* Yellow Circle */
+      .btn-3 {
+        background: #10b981;
+      } /* Green Square */
+
+      .timer-header {
+        width: 100%;
+        height: 8px;
+        background: rgba(255, 255, 255, 0.1);
+        position: fixed;
+        top: 0;
+        left: 0;
+        z-index: 100;
+      }
+      .timer-fill {
+        height: 100%;
+        background: var(--accent);
+        width: 100%;
+      }
+      .shape {
+        width: 60px;
+        height: 60px;
+        background: rgba(255, 255, 255, 0.2);
+      }
+      .triangle {
+        clip-path: polygon(50% 0%, 0% 100%, 100% 100%);
+      }
+      .diamond {
+        transform: rotate(45deg);
+        width: 45px;
+        height: 45px;
+      }
+      .circle {
+        border-radius: 50%;
+      }
+    </style>
+  </head>
+  <body>
+    <div
+      class="brand-logo"
+      style="
+        position: fixed;
+        top: 1.5rem;
+        left: 1rem;
+        z-index: 200;
+      "
+    >
+      <img src="logo.png" alt="FAHOT" style="height: 40px; filter: drop-shadow(0 0 10px rgba(99, 102, 241, 0.4));">
+    </div>
+    <div class="timer-header">
+      <div class="timer-fill" id="timer-bar"></div>
+    </div>
+
+    <div class="bg-blobs">
+      <div class="blob"></div>
+      <div class="blob blob-2"></div>
+    </div>
+
+    <div class="container quiz-container fade-in">
+      <div
+        id="loading-ui"
+        style="
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          min-height: 50vh;
+        "
+      >
+        <div style="font-size: 3rem; animation: bounce 1s infinite alternate">
+          🚀
+        </div>
+        <p class="subtitle" style="margin-top: 1rem">Hazırlanılıyor...</p>
+      </div>
+
+      <div id="quiz-ui" style="display: none; padding-top: 2rem">
+        <h2 id="status-text" style="margin-bottom: 2rem; font-size: 1.5rem">
+          Cevabını seç!
+        </h2>
+        <!-- IMAGE CONTAINER -->
+        <div
+          id="q-image-container"
+          style="display: none; text-align: center; margin-bottom: 1.5rem"
+        ></div>
+        <div class="option-grid">
+          <button class="answer-btn btn-0" id="opt-0" onclick="submitAnswer(0)">
+            <div class="shape triangle"></div>
+          </button>
+          <button class="answer-btn btn-1" id="opt-1" onclick="submitAnswer(1)">
+            <div class="shape diamond"></div>
+          </button>
+          <button class="answer-btn btn-2" id="opt-2" onclick="submitAnswer(2)">
+            <div class="shape circle"></div>
+          </button>
+          <button class="answer-btn btn-3" id="opt-3" onclick="submitAnswer(3)">
+            <div class="shape"></div>
+          </button>
+        </div>
+        <!-- JOKER BAR -->
+        <div
+          id="joker-bar"
+          style="
+            display: flex;
+            gap: 1rem;
+            justify-content: center;
+            margin-top: 1.5rem;
+            flex-wrap: wrap;
+          "
+        >
+          <button
+            id="joker-50"
+            onclick="useJoker50()"
+            style="
+              background: linear-gradient(135deg, #6366f1, #8b5cf6);
+              border: none;
+              color: white;
+              padding: 0.6rem 1.4rem;
+              border-radius: 50px;
+              font-size: 0.9rem;
+              font-weight: 900;
+              cursor: pointer;
+              box-shadow: 0 4px 15px rgba(99, 102, 241, 0.4);
+            "
+          >
+            🃏 50/50
+          </button>
+          <button
+            id="joker-time"
+            onclick="useJokerTime()"
+            style="
+              background: linear-gradient(135deg, #0ea5e9, #06b6d4);
+              border: none;
+              color: white;
+              padding: 0.6rem 1.4rem;
+              border-radius: 50px;
+              font-size: 0.9rem;
+              font-weight: 900;
+              cursor: pointer;
+              box-shadow: 0 4px 15px rgba(14, 165, 233, 0.4);
+            "
+          >
+            ⏰ +10 Sn
+          </button>
+        </div>
+      </div>
+
+      <div
+        id="reaction-bar"
+        style="
+          display: none;
+          position: fixed;
+          bottom: 20px;
+          left: 50%;
+          transform: translateX(-50%);
+          gap: 0.75rem;
+          background: var(--glass-bg);
+          padding: 0.75rem 1.25rem;
+          border-radius: 100px;
+          border: 1px solid var(--glass-border);
+          z-index: 100;
+          backdrop-filter: blur(10px);
+        "
+      >
+        <button
+          onclick="sendReaction(event, '🔥')"
+          style="
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+          "
+        >
+          🔥
+        </button>
+        <button
+          onclick="sendReaction(event, '❤️')"
+          style="
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+          "
+        >
+          ❤️
+        </button>
+        <button
+          onclick="sendReaction(event, '😂')"
+          style="
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+          "
+        >
+          😂
+        </button>
+        <button
+          onclick="sendReaction(event, '👏')"
+          style="
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+          "
+        >
+          👏
+        </button>
+        <button
+          onclick="sendReaction(event, '🤔')"
+          style="
+            background: none;
+            border: none;
+            font-size: 1.5rem;
+            cursor: pointer;
+          "
+        >
+          🤔
+        </button>
+      </div>
+    </div>
+
+    <script>
+      const client = window.supabaseClient;
+      const params = new URLSearchParams(window.location.search);
+      const gameId = params.get("gameId");
+      const playerId = params.get("playerId");
+
+      let hasAnswered = false;
+      let startTime = Date.now();
+      let correctIdx = null;
+      let currentQIndex = 0;
+      let timerDuration = 20;
+      let selectedBet = 0;
+      let isPoll = false;
+      let isLastQuestion = false;
+      let isSuperRound = false; // Süper Tur 3x puan
+      let jokerUsed50 =
+        JSON.parse(
+          sessionStorage.getItem(
+            "jkr-" + new URLSearchParams(location.search).get("gameId"),
+          ) || "{}",
+        ).used50 || false;
+      let jokerUsedTime =
+        JSON.parse(
+          sessionStorage.getItem(
+            "jkr-" + new URLSearchParams(location.search).get("gameId"),
+          ) || "{}",
+        ).usedTime || false;
+      let speedBonus = 0;
+
+      const SOUNDS = {
+        correct: new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/1435/1435-preview.mp3",
+        ),
+        wrong: new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/2568/2568-preview.mp3",
+        ),
+        tick: new Audio(
+          "https://assets.mixkit.co/active_storage/sfx/2571/2571-preview.mp3",
+        ),
+      };
+
+      function applyTheme(style) {
+        if (style === "oled") {
+          document.documentElement.style.setProperty("--bg-dark", "#000");
+          document.body.style.background = "#000";
+        } else if (style === "cyberpunk") {
+          document.documentElement.style.setProperty("--primary", "#00ff41");
+        } else if (style === "retro") {
+          document.body.style.fontFamily = '"Courier New", monospace';
+        }
+      }
+
+      function showWaitingScreen() {
+        const loading = document.getElementById("loading-ui");
+        if (loading) {
+          loading.innerHTML = `
+                    <div class="glass-card" style="border-top: 8px solid var(--primary)">
+                        <div style="font-size: 5rem; margin-bottom: 1rem; animation: pulse 2s infinite;">🎮</div>
+                        <h1 style="font-size: 2.5rem;">Lobiye Hoş Geldin!</h1>
+                        <p class="subtitle" style="font-size: 1.2rem; margin-top: 1rem;">Host yarışmayı başlatana kadar /<br>burada dinlenebilirsin.</p>
+                        <div style="margin-top: 2rem; font-size: 0.8rem; color: var(--text-muted);">Hazırlan, rekabet başlamak üzere! 🚀</div>
+                    </div>
+                `;
+        }
+      }
+
+      async function init() {
+        if (!gameId || gameId === "null") return;
+
+        try {
+          const { data: game } = await client
+            .from("games")
+            .select(
+              "current_question_index, status, branding_color, theme_style, is_betting_enabled",
+            )
+            .eq("id", gameId)
+            .single();
+          if (game) {
+            if (game.branding_color)
+              document.documentElement.style.setProperty(
+                "--primary",
+                game.branding_color,
+              );
+            applyTheme(game.theme_style);
+          }
+
+          const { data: qs } = await client
+            .from("questions")
+            .select("*")
+            .eq("game_id", gameId);
+          window.allQuestions = qs || [];
+
+          if (game && game.status === "waiting") {
+            showWaitingScreen();
+            client
+              .channel("game-start")
+              .on(
+                "postgres_changes",
+                {
+                  event: "UPDATE",
+                  schema: "public",
+                  table: "games",
+                  filter: `id=eq.${gameId}`,
+                },
+                (p) => {
+                  if (p.new.status === "in_progress")
+                    location.href = window.location.href;
+                },
+              )
+              .subscribe();
+            return;
+          }
+
+          if (game && game.status === "leaderboard") {
+            window.location.href = `results.html?gameId=${gameId}&playerId=${playerId}`;
+            return;
+          }
+
+          currentQIndex =
+            game && game.current_question_index !== undefined
+              ? game.current_question_index
+              : 0;
+          const q = window.allQuestions[currentQIndex];
+          isLastQuestion = currentQIndex === window.allQuestions.length - 1;
+          isSuperRound = q.is_super_round || false;
+
+          // Banner göster
+          if ((isLastQuestion || isSuperRound) && !isPoll) {
+            const banner = document.createElement("div");
+            banner.style.cssText =
+              "position:fixed;top:60px;left:50%;transform:translateX(-50%);color:white;padding:0.6rem 1.8rem;border-radius:50px;font-size:1rem;font-weight:900;z-index:999;animation:pulse-code 1s infinite alternate;";
+            if (isSuperRound) {
+              banner.style.background =
+                "linear-gradient(135deg,#a855f7,#6366f1)";
+              banner.style.boxShadow = "0 0 25px rgba(168,85,247,0.7)";
+              banner.textContent = "⚡ SÜPER TUR — 3X PUAN ⚡";
+            } else {
+              banner.style.background =
+                "linear-gradient(135deg,#f59e0b,#ef4444)";
+              banner.style.boxShadow = "0 0 25px rgba(245,158,11,0.7)";
+              banner.textContent = "⚡ SON SORU — 2X PUAN ⚡";
+            }
+            document.body.appendChild(banner);
+          }
+          // Kullanılmış jokerleri gri yap
+          if (jokerUsed50) {
+            const b = document.getElementById("joker-50");
+            if (b) {
+              b.style.opacity = "0.3";
+              b.disabled = true;
+              b.textContent = "🃏 50/50 ✓";
+            }
+          }
+          if (jokerUsedTime) {
+            const b = document.getElementById("joker-time");
+            if (b) {
+              b.style.opacity = "0.3";
+              b.disabled = true;
+              b.textContent = "⏰ Kullanıldı ✓";
+            }
+          }
+
+          // Eğer soru çoktan bittiyse direkt "bekleme" veya "sonuç" mantığına sokalım
+          if (game && game.status === "question_ended") {
+            // startQuizSession içinde status listener'ı tetikleyerek ekranı güncelleteceğiz
+            startQuizSession();
+            return;
+          }
+          if (q) {
+            correctIdx = q.correct_index;
+            timerDuration = q.time_limit || 20;
+            isPoll = q.is_poll || false;
+
+            const opt2 = document.getElementById("opt-2");
+            const opt3 = document.getElementById("opt-3");
+            if (q.options && (!q.options[2] || q.options[2].trim() === "")) {
+              if (opt2) opt2.style.display = "none";
+              if (opt3) opt3.style.display = "none";
+            }
+
+            // Render Image
+            if (q.image_url) {
+              const imgCont = document.getElementById("q-image-container");
+              if (imgCont) {
+                imgCont.style.display = "block";
+                imgCont.innerHTML = `<img src="${q.image_url}" style="max-width: 100%; max-height: 200px; border-radius: 12px; box-shadow: 0 5px 15px rgba(0,0,0,0.3);">`;
+              }
+            }
+          }
+
+          // --- FEATURE #6: BETTING UI (RESPECT ADMIN TOGGLE) ---
+          if (!isPoll && game.is_betting_enabled) {
+            const { data: pData } = await client
+              .from("players")
+              .select("score")
+              .eq("id", playerId)
+              .single();
+            const maxBet = Math.min(500, pData?.score || 100);
+
+            document.getElementById("loading-ui").innerHTML = `
+                        <h2 style="margin-bottom:1rem;">Risk Al! 🔥</h2>
+                        <p style="font-size:0.8rem; margin-bottom:1.5rem;">Cevabına ne kadar güveniyorsun?</p>
+                        <input type="range" id="bet-range" min="0" max="${maxBet}" step="50" value="0" style="width:100%; margin-bottom:1rem;">
+                        <div style="font-size:1.5rem; font-weight:900; color:var(--primary);" id="bet-val">0 pt</div>
+                        <button class="btn" style="margin-top:2rem;" onclick="confirmBet()">Bahse Gir!</button>
+                    `;
+            document.getElementById("bet-range").oninput = (e) => {
+              document.getElementById("bet-val").textContent =
+                e.target.value + " pt";
+            };
+            window.confirmBet = () => {
+              selectedBet = parseInt(
+                document.getElementById("bet-range").value,
+              );
+              startQuizSession();
+            };
+          } else {
+            startQuizSession();
+          }
+        } catch (err) {
+          console.error("Error:", err);
+        }
+      }
+
+      function startQuizSession() {
+        const loading = document.getElementById("loading-ui");
+        const quizUI = document.getElementById("quiz-ui");
+        const reacBar = document.getElementById("reaction-bar");
+        const container = document.querySelector(".quiz-container");
+
+        // Eğer lobideyse ekran içeriğini temizle (Düzgün geçiş için)
+        if (loading) loading.style.display = "none";
+        if (quizUI) quizUI.style.display = "block";
+        if (reacBar) reacBar.style.display = "flex";
+
+        // Eğer lobide beklerken container içeriği değişmişse geri getir
+        if (container && container.querySelector(".glass-card")) {
+          // Lobi ekranından şık ekranına geçiş yapıyoruz, tetikleyiciyi temizle
+          location.reload(); // Sadece ilk girişte lobiden kurtulmak için güvenli yöntem
+          return;
+        }
+
+        startTime = Date.now();
+        hasAnswered = false;
+
+        const bar = document.getElementById("timer-bar");
+        if (bar) {
+          bar.style.width = "100%";
+          bar.style.transition = "none";
+          setTimeout(() => {
+            bar.style.transition = `width ${timerDuration}s linear`;
+            bar.style.width = "0%";
+          }, 50);
+        }
+
+        // Soru değişimlerini dinle (Liderlik tablosuna geçiş vb.)
+        client
+          .channel("game-sync")
+          .on(
+            "postgres_changes",
+            {
+              event: "UPDATE",
+              schema: "public",
+              table: "games",
+              filter: `id=eq.${gameId}`,
+            },
+            (payload) => {
+              const ns = payload.new.status;
+              if (ns === "leaderboard") {
+                window.location.href = `results.html?gameId=${gameId}&playerId=${playerId}`;
+              } else if (
+                ns === "in_progress" &&
+                payload.new.current_question_index !== currentQIndex
+              ) {
+                location.reload(); // Yeni soruya geçişte en temiz yöntem
+              } else if (ns === "question_ended") {
+                if (window.finalFeedbackHtml) {
+                  try {
+                    window.finalSound.play().catch(() => {});
+                  } catch (e) {}
+                  document.body.innerHTML = `<div class="container fade-in">${window.finalFeedbackHtml}</div>`;
+                } else if (!hasAnswered) {
+                  hasAnswered = true; // Lock answer
+                  try {
+                    SOUNDS.wrong.play().catch(() => {});
+                  } catch (e) {}
+                  document.body.innerHTML = `
+                            <div class="container fade-in">
+                                <div class="glass-card" style="border-top: 8px solid var(--accent)">
+                                    <div style="font-size: 5rem; margin-bottom: 1rem;">⏰</div>
+                                    <h1 style="font-size: 3rem;">SÜRE BİTTİ!</h1>
+                                    <p class="subtitle" style="font-size: 1.5rem; margin-top: 1rem;">Sürenin sonuna geldik!<br>Cevap vermediğin için 0 Puan.</p>
+                                </div>
+                            </div>
+                        `;
+                }
+              }
+            },
+          )
+          .subscribe();
+      }
+
+      async function sendReaction(e, emoji) {
+        await client
+          .from("reactions")
+          .insert([{ game_id: gameId, emoji: emoji }]);
+        const btn = e.currentTarget;
+        if (btn && btn.style) {
+          btn.style.transform = "scale(1.4)";
+          setTimeout(() => (btn.style.transform = "scale(1)"), 100);
+        }
+      }
+
+      async function submitAnswer(idx) {
+        if (hasAnswered) return;
+        hasAnswered = true;
+
+        const timeTaken = (Date.now() - startTime) / 1000;
+        // GEVŞEK EŞİTLİK (==): database'den string gelse bile doğru kabul etsin
+        const isCorrect = idx == correctIdx;
+
+        if (!isPoll) {
+          window.finalSound = isCorrect ? SOUNDS.correct : SOUNDS.wrong;
+          if (isCorrect) {
+            confetti({
+              particleCount: 150,
+              spread: 70,
+              origin: { y: 0.6 }
+            });
+          }
+        }
+
+        // Streak & Points logic
+        let p = null;
+        try {
+          const { data } = await client
+            .from("players")
+            .select("score, streak")
+            .eq("id", playerId)
+            .single();
+          if (data) p = data;
+        } catch (e) {}
+
+        // Önce cevabı kaydet
+        await client.from("responses").insert([
+          {
+            game_id: gameId,
+            player_id: playerId,
+            question_index: currentQIndex,
+            selected_option: idx,
+            bet_amount: selectedBet,
+          },
+        ]);
+
+        let pts = 0;
+        let newStreak = p ? p.streak : 0;
+        speedBonus = 0;
+
+        if (!isPoll) {
+          newStreak = isCorrect ? newStreak + 1 : 0;
+          const streakBonus = isCorrect ? newStreak * 50 : 0;
+          let basePts = isCorrect
+            ? Math.max(
+                500,
+                Math.round(1000 * (1 - timeTaken / timerDuration)),
+              ) + streakBonus
+            : 0;
+
+          if (isLastQuestion && isCorrect) basePts *= 2; // Son soru 2x
+          if (isSuperRound && isCorrect) basePts *= 3; // Süper tur 3x
+
+          // Hız bonusu: ilk 3 cevap
+          if (isCorrect) {
+            try {
+              const { count: rc } = await client
+                .from("responses")
+                .select("*", { count: "exact", head: true })
+                .eq("game_id", gameId)
+                .eq("question_index", currentQIndex);
+              if (rc <= 3) speedBonus = [200, 150, 100][rc - 1] || 100;
+            } catch (e) {}
+          }
+
+          pts = isCorrect ? basePts + selectedBet + speedBonus : -selectedBet;
+          const currentScore = p ? p.score || 0 : 0;
+          await client
+            .from("players")
+            .update({
+              score: Math.max(0, currentScore + pts),
+              streak: newStreak,
+            })
+            .eq("id", playerId);
+        }
+
+        // Sonucu hazırlıyoruz ama EKRANA BASMIYORUZ!
+        window.finalFeedbackHtml = isPoll
+          ? `
+                <div class="glass-card" style="border-top: 8px solid var(--primary)">
+                    <div style="font-size: 5rem; margin-bottom: 1rem;">🗳️</div>
+                    <h1 style="font-size: 3rem;">OYUNUZ ALINDI</h1>
+                    <p class="subtitle" style="font-size: 1.5rem; margin-top: 1rem;">Katılımınız için teşekkürler!</p>
+                </div>
+            `
+          : `
+                <div class="glass-card" style="border-top: 8px solid ${isCorrect ? "var(--success)" : "var(--accent)"}">
+                    <div style="font-size: 5rem; margin-bottom: 1rem;">${isCorrect ? "🔥" : "🙊"}</div>
+                    <h1 style="font-size: 3rem;">${isCorrect ? "DOĞRU! ✨" : "YANLIŞ! 🙊"}</h1>
+                    ${isSuperRound ? `<p style="background:linear-gradient(135deg,#a855f7,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:900;">⚡ SÜPER TUR 3X</p>` : ""}
+                    ${isLastQuestion ? `<p style="background:linear-gradient(135deg,#f59e0b,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:900;">⚡ SON SORU 2X</p>` : ""}
+                    ${speedBonus > 0 ? `<p style="color:#0ea5e9;font-weight:900;">🚀 Hız Bonusu! +${speedBonus}</p>` : ""}
+                    ${selectedBet > 0 ? `<p style="color: ${isCorrect ? "var(--success)" : "var(--accent)"}; font-weight: 800;">Bahis: ${isCorrect ? "+" + selectedBet : "-" + selectedBet} Puan</p>` : ""}
+                    ${newStreak > 1 && isCorrect ? `<p style="color: #fbbf24; font-weight: 800; font-size: 1.2rem;">${newStreak} SERİ! 🔥</p>` : ""}
+                    <p class="subtitle" style="font-size: 1.5rem; margin-top: 1rem;">
+                        ${pts > 0 ? "+" + pts + " Puan" + (isSuperRound ? " (3x)" : isLastQuestion ? " (2x)" : "") : pts < 0 ? pts + " Puan" : "0 Puan"}
+                    </p>
+                </div>
+            `;
+
+        // OYUNCUYA SADECE "BEKLE" EKRANI ÇIKIYOR
+        document.body.innerHTML = `
+                <div class="container fade-in">
+                    <div class="glass-card" style="border-top: 8px solid var(--text-muted)">
+                        <div style="font-size: 5rem; margin-bottom: 1rem; display: inline-block;">⏳</div>
+                        <h1 style="font-size: 2.5rem;">Cevabın Alındı!</h1>
+                        <p class="subtitle" style="font-size: 1.2rem; margin-top: 1rem;">Tahtadaki süre dolana kadar /<br>diğer oyuncular bekleniyor...</p>
+                    </div>
+                </div>
+            `;
+      }
+
+      // Joker Fonksiyonları
+      const _jkrKey = "jkr-" + gameId;
+      window.useJoker50 = () => {
+        if (hasAnswered || jokerUsed50) return;
+        jokerUsed50 = true;
+        const saved = JSON.parse(sessionStorage.getItem(_jkrKey) || "{}");
+        sessionStorage.setItem(
+          _jkrKey,
+          JSON.stringify({ ...saved, used50: true }),
+        );
+        const btn = document.getElementById("joker-50");
+        if (btn) {
+          btn.style.opacity = "0.3";
+          btn.disabled = true;
+          btn.textContent = "🃏 50/50 ✓";
+        }
+        const wrong = [0, 1, 2, 3].filter(
+          (i) =>
+            i != correctIdx &&
+            document.getElementById("opt-" + i)?.style.display !== "none",
+        );
+        wrong
+          .sort(() => Math.random() - 0.5)
+          .slice(0, 2)
+          .forEach((i) => {
+            const b = document.getElementById("opt-" + i);
+            if (b) {
+              b.style.opacity = "0.08";
+              b.style.pointerEvents = "none";
+            }
+          });
+      };
+      window.useJokerTime = () => {
+        if (hasAnswered || jokerUsedTime) return;
+        jokerUsedTime = true;
+        const saved = JSON.parse(sessionStorage.getItem(_jkrKey) || "{}");
+        sessionStorage.setItem(
+          _jkrKey,
+          JSON.stringify({ ...saved, usedTime: true }),
+        );
+        const btn = document.getElementById("joker-time");
+        if (btn) {
+          btn.style.opacity = "0.3";
+          btn.disabled = true;
+          btn.textContent = "⏰ Kullanıldı ✓";
+        }
+        timerDuration += 10;
+        const bar = document.getElementById("timer-bar");
+        if (bar) {
+          const pct = parseFloat(bar.style.width) || 0;
+          bar.style.transition = "none";
+          setTimeout(() => {
+            bar.style.transition = `width ${timerDuration * (pct / 100)}s linear`;
+            bar.style.width = "0%";
+          }, 50);
+        }
+      };
+
+      init();
+    </script>
+  </body>
+</html>
