@@ -428,22 +428,36 @@
           }
 
           if (game && game.status === "leaderboard") {
-            document.body.innerHTML = `
-                <div class="container fade-in">
-                    <div class="glass-card" style="border-top: 8px solid var(--primary)">
-                        <div style="font-size: 5rem; margin-bottom: 1rem;">🏆</div>
-                        <h1 style="font-size: 2.5rem;">Sıralama Ekranda!</h1>
-                        <p class="subtitle" style="font-size: 1.2rem; margin-top: 1rem;">Liderlik tablosu şu an sunucu ekranında.<br>Kendi başarını takip et ve yeni soruya hazırlan!</p>
-                        <div style="margin-top: 2rem; font-size: 0.8rem; color: var(--text-muted);">Sıradaki soru birazdan gelecek... 🚀</div>
-                    </div>
-                </div>
-            `;
-            // Still listen for the next question
-            client.channel('next-q').on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` }, (p) => {
-                if (p.new.status === 'in_progress') window.location.reload();
-            }).subscribe();
-            return;
+            showSimpleWaitingScreen();
           }
+
+          function showSimpleWaitingScreen() {
+              document.body.innerHTML = `
+                  <div class="container fade-in">
+                      <div class="glass-card" style="border-top: 8px solid var(--primary); padding: 3rem 1.5rem;">
+                          <div style="font-size: 5rem; margin-bottom: 1.5rem;">🏆</div>
+                          <h1 style="font-size: 2rem;">Sıralama Ekranda!</h1>
+                          <p class="subtitle" style="font-size: 1.1rem; margin-top: 1rem;">Genel sıralama şu an sunucu ekranında yansıtılıyor.<br>Kendi başarını ana ekrandan takip et!</p>
+                          <div style="margin-top: 2.5rem; display: flex; align-items: center; justify-content: center; gap: 0.5rem; color: var(--primary); font-weight: 800;">
+                               🚀 Sıradaki tur için hazırlan...
+                          </div>
+                      </div>
+                  </div>
+              `;
+          }
+
+          // GLOBAL STATUS MONITOR
+          client.channel("status-monitor")
+            .on("postgres_changes", { event: "UPDATE", schema: "public", table: "games", filter: `id=eq.${gameId}` }, (p) => {
+                const newStatus = p.new.status;
+                if (newStatus === "in_progress") {
+                    window.location.reload();
+                } else if (newStatus === "leaderboard") {
+                    showSimpleWaitingScreen();
+                }
+            })
+            .subscribe();
+
 
           currentQIndex =
             game && game.current_question_index !== undefined
