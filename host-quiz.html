@@ -258,17 +258,28 @@
       </div>
 
       <div id="chart-ui" style="display: none">
-        <h1 style="margin-bottom: 2rem">Sonuçlar</h1>
-        <div class="chart-container" id="chart-bars" style="display: flex">
-          <!-- Grafikler gelecek -->
+        <h1 style="margin-bottom: 2rem" id="chart-title">Sonuçlar</h1>
+        <div id="comparison-labels" style="display: none; justify-content: space-around; font-weight: 800; margin-bottom: 1rem; color: var(--primary);">
+            <span>1. TUR (ÖNCE)</span>
+            <span>2. TUR (SONRA)</span>
         </div>
-        <button
-          class="btn"
-          id="btn-to-leaderboard"
-          style="margin-top: 4rem; max-width: 300px; margin-inline: auto"
-        >
-          Sıralamayı Gör <i data-lucide="trophy"></i>
-        </button>
+        <div style="display: flex; gap: 2rem; justify-content: center; align-items: flex-end;">
+            <div class="chart-container" id="chart-bars" style="display: flex">
+              <!-- Grafikler gelecek -->
+            </div>
+            <div class="chart-container" id="chart-bars-2" style="display: none; border-left: 2px dashed rgba(255,255,255,0.1); padding-left: 2rem;">
+              <!-- Grafikler gelecek -->
+            </div>
+        </div>
+        
+        <div id="chart-controls" style="margin-top: 4rem; display: flex; flex-direction: column; gap: 1rem; max-width: 400px; margin-inline: auto;">
+            <button class="btn btn-secondary" id="btn-re-ask" style="display: none; border-color: var(--primary); color: var(--primary);">
+                <i data-lucide="repeat"></i> Konuyu Anlat & Tekrar Sor
+            </button>
+            <button class="btn" id="btn-to-leaderboard">
+                Sıralamayı Gör <i data-lucide="trophy"></i>
+            </button>
+        </div>
       </div>
     </div>
 
@@ -298,6 +309,9 @@
       let answerCount = 0;
       let currentCorrectIdx = 0;
       let isPoll = false;
+      let isComparisonMode = false;
+      let attemptNumber = 1; // 1: Before explanation, 2: After explanation
+      let firstAttemptStats = null;
 
       function applyTheme(style) {
         document.body.className = "theme-" + style;
@@ -321,7 +335,7 @@
       async function init() {
         const { data: gData } = await client
           .from("games")
-          .select("branding_color, theme_style")
+          .select("branding_color, theme_style, is_comparison_mode")
           .eq("id", gameId)
           .single();
         if (gData) {
@@ -331,6 +345,7 @@
               gData.branding_color,
             );
           applyTheme(gData.theme_style);
+          isComparisonMode = gData.is_comparison_mode;
         }
 
         const { count } = await client
@@ -572,7 +587,8 @@
           .from("responses")
           .select("selected_option")
           .eq("game_id", gameId)
-          .eq("question_index", currentIndex);
+          .eq("question_index", currentIndex)
+          .eq("attempt_number", attemptNumber);
         const stats = [0, 0, 0, 0];
         if (resp) resp.forEach((r) => stats[r.selected_option]++);
 
@@ -594,8 +610,49 @@
             `,
           )
           .join("");
-        document.getElementById("chart-bars").innerHTML = chartHtml;
+
+        if (isComparisonMode && attemptNumber === 1) {
+            firstAttemptStats = stats;
+            document.getElementById("chart-bars").innerHTML = chartHtml;
+            document.getElementById("btn-re-ask").style.display = "flex";
+            document.getElementById("chart-title").textContent = "1. Tur Sonuçları (Önce)";
+            document.getElementById("btn-re-ask").onclick = () => reAskQuestion();
+        } else if (isComparisonMode && attemptNumber === 2) {
+            document.getElementById("chart-bars-2").innerHTML = chartHtml;
+            document.getElementById("chart-bars-2").style.display = "flex";
+            document.getElementById("comparison-labels").style.display = "flex";
+            document.getElementById("chart-title").textContent = "Gelişim Karşılaştırması";
+            document.getElementById("btn-re-ask").style.display = "none";
+        } else {
+            document.getElementById("chart-bars").innerHTML = chartHtml;
+        }
         lucide.createIcons();
+      }
+
+      async function reAskQuestion() {
+          attemptNumber = 2;
+          timeLeft = questions[currentIndex].time_limit || 20;
+          answerCount = 0;
+          document.getElementById("chart-ui").style.display = "none";
+          document.getElementById("quiz-ui").style.display = "block";
+          document.getElementById("countdown").textContent = timeLeft;
+          
+          // Clear visual correct marks
+          document.querySelectorAll(".answer-row").forEach(row => {
+              row.classList.remove("correct-mark", "wrong-mark");
+          });
+
+          // Signal players to re-answer
+          await client.from('games').update({ 
+              status: 'in_progress',
+              current_question_index: currentIndex // ensure it triggers update
+          }).eq('id', gameId);
+          
+          // We need a specific signal for "Second Attempt"
+          // We'll update a 'current_attempt' in the game table too if needed, but for now 
+          // we'll use a hack of updating the status again.
+          
+          startTimer();
       }
 
       document.getElementById("btn-to-leaderboard").onclick = async () => {

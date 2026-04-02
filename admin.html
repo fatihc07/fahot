@@ -152,6 +152,23 @@
                 style="width: 25px; height: 25px; cursor: pointer"
               />
             </div>
+            <div style="text-align: left">
+              <label
+                style="
+                  font-size: 0.6rem;
+                  font-weight: 800;
+                  color: var(--text-muted);
+                  display: block;
+                  white-space: nowrap;
+                "
+                >KARŞILAŞTIRMA</label
+              >
+              <input
+                type="checkbox"
+                id="is-comparison-enabled"
+                style="width: 25px; height: 25px; cursor: pointer"
+              />
+            </div>
             <div style="text-align: right">
               <label
                 style="
@@ -795,6 +812,7 @@
             : "default";
           const isBetEnabled =
             document.getElementById("is-bet-enabled").checked;
+          const isComparisonEnabled = document.getElementById("is-comparison-enabled").checked;
 
           document
             .querySelectorAll(".glass-card.fade-in")
@@ -832,6 +850,7 @@
             .update({
               theme_style: themeStyle,
               is_betting_enabled: isBetEnabled,
+              is_comparison_mode: isComparisonEnabled,
             })
             .eq("id", game.id);
 

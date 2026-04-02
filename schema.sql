@@ -10,6 +10,7 @@ CREATE TABLE games (
   branding_color TEXT DEFAULT '#6366f1',
   theme_style TEXT DEFAULT 'default', -- default, oled, cyberpunk, retro
   is_betting_enabled BOOLEAN DEFAULT FALSE,
+  is_comparison_mode BOOLEAN DEFAULT FALSE, -- Two attempts per question for learning check
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 
@@ -49,6 +50,7 @@ CREATE TABLE responses (
   question_index INTEGER NOT NULL,
   selected_option INTEGER NOT NULL,
   bet_amount INTEGER DEFAULT 0,
+  attempt_number INTEGER DEFAULT 1, -- 1 for first try, 2 for second try (Comparison Mode)
   created_at TIMESTAMP WITH TIME ZONE DEFAULT NOW()
 );
 

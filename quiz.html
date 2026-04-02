@@ -360,6 +360,30 @@
             .eq("game_id", gameId);
           window.allQuestions = qs || [];
 
+          currentQIndex = (game && game.current_question_index !== undefined) ? game.current_question_index : 0;
+          
+          // Check existing responses to see the attempt number
+          const { data: myResp } = await client
+            .from("responses")
+            .select("attempt_number")
+            .eq("game_id", gameId)
+            .eq("player_id", playerId)
+            .eq("question_index", currentQIndex)
+            .order('attempt_number', { ascending: false });
+          
+          let latestAttempt = 1;
+          if (myResp && myResp.length > 0) {
+              latestAttempt = myResp[0].attempt_number;
+              // If the player answered latestAttempt, and the game status is "in_progress", 
+              // but the host hasn't signaled for a second attempt yet, we show "already answered".
+              // However, if the host JUST signaled a second attempt (by updating status), 
+              // but we only have attempt_number=1 in DB, then we are on attempt=2.
+              
+              // We'll rely on the host's status signal too.
+              hasAnswered = true; 
+          }
+          window.attemptNumber = latestAttempt;
+
           if (game && game.status === "waiting") {
             showWaitingScreen();
             client
@@ -373,8 +397,23 @@
                   filter: `id=eq.${gameId}`,
                 },
                 (p) => {
-                  if (p.new.status === "in_progress")
-                    location.href = window.location.href;
+                  if (p.new.status === "in_progress") {
+                    if (p.new.current_question_index === currentQIndex && window.attemptNumber === 1) {
+                        // RE-ASK MODE TRIGGERED
+                        window.attemptNumber = 2;
+                        hasAnswered = false;
+                        document.getElementById("status-msg").textContent = "👩‍🏫 Tekrar Soruluyor (2. Tur)";
+                        // Re-enable buttons
+                        document.querySelectorAll('.answer-btn').forEach(b => {
+                            b.disabled = false;
+                            b.classList.remove('selected', 'wrong', 'correct', 'dim');
+                        });
+                        // Restart countdown if possible, but simpler to just reload or re-render
+                        window.location.reload(); 
+                    } else {
+                        location.href = window.location.href;
+                    }
+                  }
                 },
               )
               .subscribe();
@@ -619,6 +658,7 @@
             question_index: currentQIndex,
             selected_option: idx,
             bet_amount: selectedBet,
+            attempt_number: window.attemptNumber || 1,
           },
         ]);
 
