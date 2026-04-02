@@ -27,11 +27,17 @@ io.on('connection', (socket) => {
             const tableData = db[query.table] = db[query.table] || [];
 
             if (query.action === 'insert') {
-                const inserted = query.data.map(item => ({
-                    id: crypto.randomUUID(),
-                    created_at: new Date().toISOString(),
-                    ...item
-                }));
+                const inserted = query.data.map(item => {
+                    const defaults = {};
+                    if (query.table === 'players') { defaults.score = 0; defaults.streak = 0; defaults.avatar = '👤'; defaults.team = 'Bireysel'; }
+                    if (query.table === 'games') { defaults.status = 'waiting'; defaults.current_question_index = 0; }
+                    return {
+                        id: crypto.randomUUID(),
+                        created_at: new Date().toISOString(),
+                        ...defaults,
+                        ...item
+                    };
+                });
                 tableData.push(...inserted);
                 result = query.single ? inserted[0] : inserted;
                 inserted.forEach(item => {

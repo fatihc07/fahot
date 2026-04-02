@@ -692,12 +692,12 @@
           }
 
           pts = isCorrect ? basePts + selectedBet + speedBonus : -selectedBet;
-          const currentScore = p ? p.score || 0 : 0;
+          const currentScore = (p && p.score !== undefined) ? p.score : 0;
           await client
             .from("players")
             .update({
               score: Math.max(0, currentScore + pts),
-              streak: newStreak,
+              streak: (newStreak !== undefined) ? newStreak : 0,
             })
             .eq("id", playerId);
         }
