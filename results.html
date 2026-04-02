@@ -302,6 +302,18 @@
             <button class="btn" id="btn-home" style="display: none; margin-top: 2rem;" onclick="window.location.href='index.html'">
                 Ana Sayfaya Dön
             </button>
+
+            <!-- Comparison Pass Logic -->
+            <div id="comparison-controls" style="display: none; margin-top: 3rem; flex-direction: column; gap: 1.5rem; align-items: center; border-radius: 16px; background: rgba(99, 102, 241, 0.05); border: 2px dashed rgba(99, 102, 241, 0.2); padding: 2rem;">
+                <h3 style="color: var(--primary); font-size: 1.2rem;">📊 KARŞILAŞTIRMALI ÖĞRENME</h3>
+                <p id="pass-msg" style="color: var(--text-muted); font-size: 0.9rem; margin-bottom: 0.5rem; text-align: center;">1. Tur tamamlandı! Konuları anlattıysan 2. Turu başlatabilirsin.</p>
+                <button class="btn" id="btn-start-pass-2" style="background: linear-gradient(135deg, #a855f7, #6366f1); box-shadow: 0 0 25px rgba(168, 85, 247, 0.4);">
+                    <i data-lucide="repeat"></i> Konuları Anlat & 2. Turu Başlat
+                </button>
+                <div id="session-comparison-chart" style="display: none; width: 100%; margin-top: 1rem;">
+                    <!-- Comparison stats will go here -->
+                </div>
+            </div>
         </div>
     </div>
 
@@ -330,15 +342,46 @@
         const playerId = params.get('playerId');
         const nextIdx = params.get('next');
         const isFinal = params.get('final') === 'true';
+        let currentPass = 1;
+        let isCompMode = false;
 
         async function load() {
+            const { data: gameData } = await client.from('games').select('*').eq('id', gameId).single();
+            if (gameData) {
+                isCompMode = gameData.is_comparison_mode;
+                currentPass = gameData.current_pass || 1;
+            }
+
             const { data: players } = await client.from('players').select('nickname, score, avatar, team, streak').eq('game_id', gameId).order('score', { ascending: false });
             if (!players) return;
 
             if (isFinal) {
-                document.getElementById('title').textContent = "BÜYÜK FİNAL!";
-                document.getElementById('subtitle').textContent = "Sonuçlar ve İstatistikler";
+                document.getElementById('title').textContent = currentPass === 1 ? "BÜYÜK FİNAL (1. TUR)" : "SONUÇLAR (2. TUR)";
+                document.getElementById('subtitle').innerHTML = `🥇 ${players[0]?.nickname || '-'} ile Yarışma Tamamlandı! 🔥`;
+                
+                if (isCompMode) {
+                    const controls = document.getElementById('comparison-controls');
+                    if (controls) {
+                        controls.style.display = 'flex';
+                        if (currentPass === 1) {
+                            document.getElementById('btn-start-pass-2').onclick = async () => {
+                                await client.from('games').update({ 
+                                    status: 'in_progress', 
+                                    current_question_index: 0, 
+                                    current_pass: 2 
+                                }).eq('id', gameId);
+                                window.location.href = `host-quiz.html?gameId=${gameId}&index=0`;
+                            };
+                        } else {
+                            document.getElementById('pass-msg').textContent = "🛡️ 2 TUR TAMAMLANDI! ÖĞRENME BAŞARI İSTATİSTİĞİ";
+                            document.getElementById('btn-start-pass-2').style.display = 'none';
+                            showGlobalComparison();
+                        }
+                    }
+                }
+                
                 document.getElementById('podium').style.display = 'flex';
+                document.getElementById('subtitle').textContent = "Sonuçlar ve İstatistikler";
                 
                 // --- FEATURE #5: DIFFICULTY ANALYZER ---
                 const { data: resps } = await client.from('responses').select('question_index, selected_option').eq('game_id', gameId);
@@ -579,6 +622,49 @@
                 document.getElementById('reaction-container').appendChild(el);
                 setTimeout(() => el.remove(), 4000);
             }).subscribe();
+
+            // Also listen for game pass updates 
+            client.channel('pass-tracker').on('postgres_changes', { 
+                event: 'UPDATE', schema: 'public', table: 'games', filter: `id=eq.${gameId}` 
+            }, (p) => {
+                if (p.new.current_pass === 2 && currentPass === 1) {
+                    window.location.reload();
+                }
+            }).subscribe();
+        }
+        
+        async function showGlobalComparison() {
+            const { data: resps } = await client.from('responses').select('question_index, selected_option, attempt_number').eq('game_id', gameId);
+            const { data: qs } = await client.from('questions').select('correct_index').eq('game_id', gameId);
+            
+            if (!resps || !qs) return;
+
+            const pass1Correct = qs.map((q, i) => resps.filter(r => r.question_index == i && r.attempt_number == 1 && String(r.selected_option) === String(q.correct_index)).length);
+            const pass2Correct = qs.map((q, i) => resps.filter(r => r.question_index == i && r.attempt_number == 2 && String(r.selected_option) === String(q.correct_index)).length);
+
+            const total1 = pass1Correct.reduce((a, b) => a + b, 0);
+            const total2 = pass2Correct.reduce((a, b) => a + b, 0);
+            const max = Math.max(total1, total2, 1);
+
+            const chartEl = document.getElementById('session-comparison-chart');
+            chartEl.style.display = 'block';
+            chartEl.innerHTML = `
+                <div style="display: flex; justify-content: space-around; align-items: flex-end; height: 150px; padding-top: 2rem;">
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 40%;">
+                        <div style="height: ${(total1/max)*100}px; width: 50px; background: var(--accent); border-radius: 8px 8px 0 0; box-shadow: 0 0 20px var(--accent);"></div>
+                        <span style="font-weight: 800; font-size: 1.2rem;">${total1}</span>
+                        <span style="font-size: 0.7rem; color: var(--text-muted);">1. TUR (ÖNCE)</span>
+                    </div>
+                    <div style="display: flex; flex-direction: column; align-items: center; gap: 0.5rem; width: 40%;">
+                        <div style="height: ${(total2/max)*100}px; width: 50px; background: var(--success); border-radius: 8px 8px 0 0; box-shadow: 0 0 20px var(--success);"></div>
+                        <span style="font-weight: 800; font-size: 1.2rem;">${total2}</span>
+                        <span style="font-size: 0.7rem; color: var(--success); font-weight: 900;">2. TUR (SONRA)</span>
+                    </div>
+                </div>
+                <p style="margin-top: 2rem; font-weight: 700; color: #fbbf24; text-align: center;">
+                    ⚡ ${total2 > total1 ? `Öğrenme başarısı %${Math.round(((total2-total1)/max)*100)} arttı!` : 'Karşılaştırma tamamlandı.'}
+                </p>
+            `;
         }
         
         load();

@@ -728,21 +728,14 @@
                 <div class="glass-card" style="border-top: 8px solid var(--primary)">
                     <div style="font-size: 5rem; margin-bottom: 1rem;">🗳️</div>
                     <h1 style="font-size: 3rem;">OYUNUZ ALINDI</h1>
-                    <p class="subtitle" style="font-size: 1.5rem; margin-top: 1rem;">Katılımınız için teşekkürler!</p>
+                    <p class="subtitle" style="font-size: 1.5rem; margin-top: 1rem;">Katılım için teşekkürler!</p>
                 </div>
             `
           : `
                 <div class="glass-card" style="border-top: 8px solid ${isCorrect ? "var(--success)" : "var(--accent)"}">
-                    <div style="font-size: 5rem; margin-bottom: 1rem;">${isCorrect ? "🔥" : "🙊"}</div>
-                    <h1 style="font-size: 3rem;">${isCorrect ? "DOĞRU! ✨" : "YANLIŞ! 🙊"}</h1>
-                    ${isSuperRound ? `<p style="background:linear-gradient(135deg,#a855f7,#6366f1);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:900;">⚡ SÜPER TUR 3X</p>` : ""}
-                    ${isLastQuestion ? `<p style="background:linear-gradient(135deg,#f59e0b,#ef4444);-webkit-background-clip:text;-webkit-text-fill-color:transparent;font-weight:900;">⚡ SON SORU 2X</p>` : ""}
-                    ${speedBonus > 0 ? `<p style="color:#0ea5e9;font-weight:900;">🚀 Hız Bonusu! +${speedBonus}</p>` : ""}
-                    ${selectedBet > 0 ? `<p style="color: ${isCorrect ? "var(--success)" : "var(--accent)"}; font-weight: 800;">Bahis: ${isCorrect ? "+" + selectedBet : "-" + selectedBet} Puan</p>` : ""}
-                    ${newStreak > 1 && isCorrect ? `<p style="color: #fbbf24; font-weight: 800; font-size: 1.2rem;">${newStreak} SERİ! 🔥</p>` : ""}
-                    <p class="subtitle" style="font-size: 1.5rem; margin-top: 1rem;">
-                        ${pts > 0 ? "+" + pts + " Puan" + (isSuperRound ? " (3x)" : isLastQuestion ? " (2x)" : "") : pts < 0 ? pts + " Puan" : "0 Puan"}
-                    </p>
+                    <div style="font-size: 5rem; margin-bottom: 1rem;">${isCorrect ? "✅" : "❌"}</div>
+                    <h1 style="font-size: 3rem;">${isCorrect ? "DOĞRU!" : "YANLIŞ!"}</h1>
+                    <p class="subtitle" style="font-size: 1.2rem; margin-top: 1rem;">Diğer oyuncuların bitirmesi bekleniyor...</p>
                 </div>
             `;
 
